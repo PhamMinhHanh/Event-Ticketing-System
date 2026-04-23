@@ -44,41 +44,45 @@ Dự án được phát triển theo từng giai đoạn (Milestones).
 Yêu cầu máy tính đã cài đặt sẵn **Python (>=3.8)** và **MySQL Server**.
 
 ### Bước 1: Clone source code
-git clone https://github.com/PhamMinhHanh/Event-Ticketing-System.git
-cd Event-Ticketing-System
+*git clone https://github.com/PhamMinhHanh/Event-Ticketing-System.git*
+
+*cd Event-Ticketing-System*
 
 
 ### Bước 2: Thiết lập môi trường ảo (Virtual Environment)
 #### Tạo môi trường ảo
-python -m venv .venv
+*python -m venv .venv*
 
 #### Kích hoạt (Windows)
-.venv\Scripts\activate
+*.venv\Scripts\activate*
 
 
 ### Bước 3: Cài đặt thư viện
-pip install -r requirements.txt
+*pip install -r requirements.txt*
 
 
 ### Bước 4: Thiết lập Cơ sở dữ liệu
 #### Tạo db trên SQL
 Mở MySQL, tạo một database trống có tên event_ticketing:
-CREATE DATABASE event_ticketing;
+
+*CREATE DATABASE event_ticketing;*
 
 #### Chỉnh thông tin kết nối tới MySQL
 Mở file config.py và điều chỉnh chuỗi kết nối (URI) cho khớp với user/password MySQL trên máy cá nhân:
-SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://<user_cua_ban>:<password_cua_ban>@lo
+
+*SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://<user_cua_ban>:<password_cua_ban>@lo*
 
 
 ### Bước 5: Nạp dữ liệu mẫu (Mock Data)
 Để có sẵn dữ liệu các danh mục, sự kiện và loại vé để test, chạy script sau:
-python seed.py
+
+*python seed.py*
 
 (Nếu Terminal báo "Tạo Mock Data thành công!" là bạn đã làm đúng).
 
 
 ### Bước 6: Khởi chạy Server
-python run.py
+*python run.py*
 
 Mở trình duyệt: http://127.0.0.1:5000
 
