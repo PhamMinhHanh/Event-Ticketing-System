@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EventBox{% endblock %}</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    {% block styles %}{% endblock %} </head>
+<body>
+{% block navbar %}
+    <div class="bg-white border-bottom py-3 mb-4">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-2">
+                    <a href="{{ url_for('main.index') }}" class="text-decoration-none navbar-brand fw-bold text-primary">EVENTBOX</a>
+                </div>
+                <div class="col-md-6">
+                    <form action="{{ url_for('main.index') }}" method="get" class="d-flex">
+                        <input type="text" name="q" class="form-control" placeholder="Bạn tìm gì hôm nay">
+                        <button class="btn btn-outline-success" type="submit">Tìm</button>
+                    </form>
+                </div>
+                <div class="col-md-4 text-end">
+                    {% if 'user_id' in session %}
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                👋 Chào, {{ session['user_name'] }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                {% set current_role = session['user_role'] | string %}
+                                
+                                {% if 'USER' in current_role %}
+                                    <li><a class="dropdown-item" href="#">🎟️ Vé của tôi</a></li>
+                                {% elif 'ORGANIZER' in current_role %}
+                                    <li><a class="dropdown-item" href="#">⚙️ Quản lý sự kiện</a></li>
+                                    <li><a class="dropdown-item" href="#">📊 Thống kê doanh thu</a></li>
+                                {% endif %}
+                                
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="{{ url_for('main.logout') }}">Đăng xuất</a></li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <a href="{{ url_for('main.login') }}" class="btn btn-outline-primary me-2">Đăng nhập</a>
+                        <a href="{{ url_for('main.register') }}" class="btn btn-primary">Đăng ký</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="py-4 bg-light mt-5 text-center">
+        <p class="mb-0 text-muted">© 2026 EventBox. Dự án Công nghệ Phần mềm OU.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
