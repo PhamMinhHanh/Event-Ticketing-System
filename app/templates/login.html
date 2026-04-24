@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block navbar %}{% endblock %}
+
+{% block title %}Đăng nhập - EventBox{% endblock %}
+
+{% block styles %}
+<style>
+    /* Tăng chiều cao lên 85vh để căn giữa đều và đẹp hơn so với Footer */
+    .auth-wrapper {
+        min-height: 85vh; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+    .login-card {
+        background-color: #ffffff;
+        border-radius: 1.5rem;
+        border: 1px solid #e9ecef;
+        padding: 2.5rem 3rem;
+        width: 100%;
+        max-width: 480px;
+        position: relative; /* Cần thiết để nút X định vị đúng */
+    }
+    .brand-title {
+        color: #0d6efd;
+        font-weight: 800;
+        font-size: 2.2rem;
+    }
+    .btn-close-custom {
+        position: absolute;
+        top: 20px;
+        right: 25px;
+        font-size: 1.5rem;
+        color: #6c757d;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .btn-close-custom:hover {
+        color: #343a40;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="login-card shadow-sm">
+        
+        <a href="{{ url_for('main.index') }}" class="btn-close-custom" title="Về trang chủ">&times;</a>
+
+        <div class="text-center mb-4 pb-2">
+            <a href="{{ url_for('main.index') }}" class="text-decoration-none">
+                <h1 class="brand-title mb-2">EventBox</h1>
+            </a>
+            <p class="text-dark">Đăng nhập vào hệ thống</p>
+        </div>
+
+        <form action="{{ url_for('main.login') }}" method="POST">
+            <div class="mb-3">
+                <label for="email" class="form-label text-dark mb-1">Email</label>
+                <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label text-dark mb-1">Mật khẩu</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="1" id="remember" name="remember" checked>
+                    <label class="form-check-label text-dark" for="remember">Ghi nhớ đăng nhập</label>
+                </div>
+                <a href="#" class="text-primary text-decoration-none" style="font-size: 0.95rem;">Quên mật khẩu?</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 mb-4 fw-medium">Đăng nhập</button>
+
+            <div class="text-center" style="font-size: 0.95rem;">
+                <span class="text-dark">Chưa có tài khoản?</span> 
+                <a href="{{ url_for('main.register') }}" class="text-primary text-decoration-none">Đăng ký</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -9,6 +9,12 @@ def create_app():
 
     db.init_app(app)
 
-    from app import models
+    with app.app_context():
+        from app import models
+        from app.routes import main_bp
+
+        app.register_blueprint(main_bp)
+
+        db.create_all()
 
     return app
