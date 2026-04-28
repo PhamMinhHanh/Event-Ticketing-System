@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Thanh toán - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="row">
+        <div class="col-lg-7">
+            <h3 class="mb-4 fw-bold">Thông tin nhận vé</h3>
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 1rem;">
+                <div class="card-body p-4">
+                    <form action="#" method="POST" id="checkout-form">
+                        <div class="mb-3">
+                            <label class="form-label text-muted fw-medium">Họ và tên</label>
+                            <input type="text" class="form-control p-2" name="full_name" 
+                                   value="{{ session.get('user_name', '') }}" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted fw-medium">Email (nhận mã QR)</label>
+                                <input type="email" class="form-control p-2" name="email" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted fw-medium">Số điện thoại</label>
+                                <input type="text" class="form-control p-2" name="phone" required>
+                            </div>
+                        </div>
+                        <hr class="my-4">
+                        <h5 class="fw-bold mb-3">Phương thức thanh toán</h5>
+                        <div class="form-check border rounded p-3 mb-2">
+                            <input class="form-check-input ms-1" type="radio" name="payment_method" value="MOMO" id="momo" checked>
+                            <label class="form-check-label ms-2" for="momo">Ví MoMo</label>
+                        </div>
+                        <div class="form-check border rounded p-3">
+                            <input class="form-check-input ms-1" type="radio" name="payment_method" value="VNPAY" id="vnpay">
+                            <label class="form-check-label ms-2" for="vnpay">VNPAY (Thẻ ATM/Visa)</label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <h3 class="mb-4 fw-bold">Tóm tắt đơn hàng</h3>
+            <div class="card shadow-sm border-0" style="border-radius: 1rem;">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold text-primary mb-1">{{ event.title }}</h5>
+                    <p class="text-muted small mb-4"><i class="bi bi-geo-alt"></i> {{ event.location }}</p>
+
+                    {% for item in cart['items'] %}
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <div>
+                            <span class="d-block fw-medium">{{ item.name }}</span>
+                            <small class="text-muted">{{ "{:,.0f}".format(item.price).replace(',', '.') }}đ x {{ item.quantity }}</small>
+                        </div>
+                        <span class="fw-medium">{{ "{:,.0f}".format(item.subtotal).replace(',', '.') }}đ</span>
+                    </div>
+                    {% endfor %}
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <span class="fw-bold fs-5">Tổng thanh toán</span>
+                        <span class="fw-bold fs-5 text-primary">{{ "{:,.0f}".format(cart.total_amount).replace(',', '.') }}đ</span>
+                    </div>
+
+                    <button type="submit" form="checkout-form" class="btn btn-primary w-100 py-3 mt-4 fw-bold fs-6" style="border-radius: 0.5rem;">
+                        Xác nhận & Thanh toán
+                    </button>
+                    <p class="text-center text-muted small mt-3 mb-0">Bằng việc bấm xác nhận, bạn đồng ý với Điều khoản dịch vụ của EventBox.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
