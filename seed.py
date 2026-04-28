@@ -1,19 +1,29 @@
 from app import create_app, db
-from app.models import Category, Event, TicketType
+from app.models import Category, Event, TicketType, User, Organizer
 from datetime import datetime, timedelta
 
 # Khởi tạo app để lấy cấu hình kết nối CSDL
 app = create_app()
 
 with app.app_context():
-    # 1. Xóa toàn bộ bảng cũ và tạo lại bảng mới (Làm sạch Database)
+    # Xóa toàn bộ bảng cũ và tạo lại bảng mới (Làm sạch Database)
     print("Đang làm sạch Database...")
     db.drop_all()
     db.create_all()
 
     print("Đang tạo dữ liệu mẫu (Mock Data)...")
 
-    # 2. Tạo các Danh mục sự kiện
+    # Tạo một User là Nhà tổ chức
+    org_user = User(full_name="Công ty Giải trí OUEvents", email="org@eventbox.com", phone="0999999999", role="ORGANIZER")
+    org_user.set_password("123456")
+    db.session.add(org_user)
+    db.session.commit()
+
+    org_profile = Organizer(user_id=org_user.id, name="OUEvents Official")
+    db.session.add(org_profile)
+    db.session.commit()
+
+    # Tạo các Danh mục sự kiện
     cat_music = Category(name='Âm nhạc', description='Các buổi hòa nhạc, liveshow')
     cat_sport = Category(name='Thể thao', description='Các trận đấu thể thao, giải đấu')
     cat_workshop = Category(name='Hội thảo', description='Hội thảo chuyên đề, talkshow')
@@ -23,17 +33,19 @@ with app.app_context():
     db.session.add_all([cat_music, cat_sport, cat_workshop, cat_theater])
     db.session.commit()
 
-    # 3. Tạo các Sự kiện
+    # Tạo các Sự kiện
     # Dùng timedelta để ngày sự kiện luôn ở tương lai so với thời điểm chạy code
     event1 = Event(
         category_id=cat_music.id,
         title='Tan Tan Acoustic - DATE NIGHT',
         description='Một buổi tối với ánh đèn vàng, sân khấu acoustic nhỏ và những giai điệu quen thuộc trong không gian ấm áp.',
         location='Tan Tan Café Acoustic',
+        province="TP.HCM",
         start_time=datetime.now() + timedelta(days=10),
         end_time=datetime.now() + timedelta(days=10, hours=3),
         banner_url='https://salt.tkbcdn.com/ts/ds/5d/bd/4c/7e7634e6feb267283819752d0bbb162e.png',
-        base_price=140000
+        base_price=140000,
+        organizer_id=org_profile.user_id
     )
 
     event2 = Event(
@@ -41,10 +53,12 @@ with app.app_context():
         title='ĐUA XE GO-KART CITY PARK',
         description='Trải nghiệm Go Kart tại The Global City – Tốc độ đỉnh cao giữa lòng TP.HCM',
         location='THE GLOBAL CITY',
+        province="TP.HCM",
         start_time=datetime.now() + timedelta(days=5),
         end_time=datetime.now() + timedelta(days=5, hours=2),
         banner_url='https://salt.tkbcdn.com/ts/ds/d7/e7/f7/44b4ab809ab3e945f80730175c343f31.jpg',
-        base_price=100000
+        base_price=100000,
+        organizer_id=org_profile.user_id
     )
 
     event3 = Event(
@@ -52,10 +66,12 @@ with app.app_context():
         title='Anh Hùng Cờ Lau',
         description='Show Thực Cảnh “Anh Hùng Cờ Lau – Đinh Bộ Lĩnh” là vở diễn ngoài trời quy mô lớn tái hiện hành trình từ cậu bé chăn trâu phất cờ lau tập trận đến khi lên ngôi Hoàng đế, mở đầu triều đại Đại Cồ Việt — thời kỳ độc lập đầu tiên của dân tộc.',
         location='Sân Khấu Thuỷ Đình Phố Cổ Hoa Lư',
+        province="Ninh Bình",
         start_time=datetime.now() + timedelta(days=15),
         end_time=datetime.now() + timedelta(days=15, hours=1),
         banner_url='https://salt.tkbcdn.com/ts/ds/4f/4d/31/6da02c3b396bc1b68fc3e487a9cb1fab.png',
-        base_price=150000
+        base_price=150000,
+        organizer_id=org_profile.user_id
     )
 
     event4 = Event(
@@ -66,7 +82,8 @@ with app.app_context():
         start_time=datetime.now() + timedelta(days=7),
         end_time=datetime.now() + timedelta(days=7, hours=2),
         banner_url='https://salt.tkbcdn.com/ts/ds/db/d9/6b/7ef0f96eb6bc673df8fd0a7163f1a640.jpg',
-        base_price=300000
+        base_price=300000,
+        organizer_id=org_profile.user_id
     )
 
     db.session.add_all([event1, event2, event3, event4])

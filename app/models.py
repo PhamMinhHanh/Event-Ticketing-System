@@ -14,15 +14,22 @@ class Category(db.Model):
 class Event(db.Model):
     __tablename__ = 'events'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
-    category_id = db.Column(db.BigInteger, db.ForeignKey('categories.id'))
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     location = db.Column(db.String(255), nullable=False)
+    province = db.Column(db.String(100), nullable=False, default="TP.HCM")  
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     banner_url = db.Column(db.String(255), nullable=True)
-    base_price = db.Column(db.Numeric(12, 2), default=0)
-    ticket_types = db.relationship('TicketType', backref='event', lazy=True)
+    base_price = db.Column(db.Float, nullable=False, default=0.0)
+    category_id = db.Column(db.BigInteger, db.ForeignKey('categories.id'), nullable=False)
+    
+    # Khóa ngoại với Organizer
+    organizer_id = db.Column(db.BigInteger, db.ForeignKey('organizers.user_id'), nullable=False)
+    
+    # Relationship
+    organizer = db.relationship('Organizer', backref=db.backref('events', lazy=True))
+
 
 # Bảng Loại vé
 class TicketType(db.Model):

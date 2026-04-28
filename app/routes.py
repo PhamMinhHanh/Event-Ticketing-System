@@ -5,21 +5,46 @@ from app.models import User, Organizer, Event, Category, TicketType
 # Khởi tạo Blueprint thay vì gọi trực tiếp biến 'app'
 main_bp = Blueprint('main', __name__)
 
+# Dữ liệu  toàn cục, mọi file HTML gọi được
+@main_bp.context_processor
+def inject_global_vars():
+    categories = Category.query.all()
+    # Lấy Tỉnh/Thành phố không trùng lặp
+    provinces_data = db.session.query(Event.province).distinct().all()
+    provinces = [p[0] for p in provinces_data if p[0]]
+    return dict(categories=categories, provinces=provinces)
+
 @main_bp.route('/')
 def index():
-    #Duyệt và Tìm kiếm sự kiện
-    query = request.args.get('q', '')
-    category_id = request.args.get('category', type=int)
-    
-    events_query = Event.query
-    if query:
-        events_query = events_query.filter(Event.title.contains(query))
-    if category_id:
-        events_query = events_query.filter_by(category_id=category_id)
-        
-    events = events_query.all()
+    keyword = request.args.get('q', '')
+    category_id = request.args.get('category')
+    province = request.args.get('province')
+
+    query = Event.query
+
+    # Tìm trong tiêu đề HOẶC mô tả
+    if keyword:
+        # không phân biệt chữ hoa/chữ thường
+        query = query.filter(db.or_(
+            Event.title.ilike(f'%{keyword}%'),
+            Event.description.ilike(f'%{keyword}%')
+        ))
+
+    # Lọc theo danh mục
+    if category_id and category_id.isdigit():
+        query = query.filter(Event.category_id == int(category_id))
+
+    # Lọc theo địa điểm (Tỉnh/Thành phố)
+    if province and province != 'all':
+        query = query.filter(Event.province == province)
+
+    events = query.all()
     categories = Category.query.all()
-    return render_template('index.html', events=events, categories=categories)
+    
+    provinces_data = db.session.query(Event.province).distinct().all()
+    provinces = [p[0] for p in provinces_data if p[0]]
+
+    return render_template('index.html', events=events, categories=categories, provinces=provinces)
 
 @main_bp.route('/event/<int:event_id>')
 def event_detail(event_id):
