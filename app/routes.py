@@ -113,3 +113,60 @@ def register():
         return redirect(url_for('main.login'))
 
     return render_template('register.html')
+
+# XỬ LÝ ĐẶT VÉ
+@main_bp.route('/checkout/<int:event_id>', methods=['GET', 'POST'])
+def checkout(event_id):
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập để tiến hành đặt vé!', 'error')
+        return redirect(url_for('main.login'))
+
+    event = Event.query.get_or_404(event_id)
+
+    # 1. NẾU LÀ POST: Người dùng vừa bấm "Tiếp tục đặt vé" từ trang chi tiết
+    if request.method == 'POST':
+        cart = []
+        total_amount = 0
+
+        # Quét qua tất cả các ô nhập số lượng vé gửi lên
+        for key, value in request.form.items():
+            if key.startswith('ticket_') and int(value) > 0:
+                ticket_type_id = int(key.split('_')[1])
+                qty = int(value)
+                ticket_type = TicketType.query.get(ticket_type_id)
+
+                # Xác minh vé hợp lệ và tính tiền
+                if ticket_type and ticket_type.event_id == event.id:
+                    subtotal = qty * float(ticket_type.price)
+                    total_amount += subtotal
+                    cart.append({
+                        'ticket_type_id': ticket_type.id,
+                        'name': ticket_type.name,
+                        'price': float(ticket_type.price),
+                        'quantity': qty,
+                        'subtotal': float(subtotal)
+                    })
+
+        # Báo lỗi nếu chưa chọn vé nào
+        if not cart:
+            flash('Vui lòng chọn ít nhất 1 vé để tiếp tục!', 'error')
+            return redirect(url_for('main.event_detail', event_id=event.id))
+
+        # Lưu toàn bộ giỏ hàng vào Session
+        session['cart'] = {
+            'event_id': event.id,
+            'items': cart,
+            'total_amount': total_amount
+        }
+        # Chuyển hướng sang giao diện điền thông tin Checkout
+        return redirect(url_for('main.checkout', event_id=event.id))
+
+    # 2. NẾU LÀ GET: Hiển thị giao diện trang Checkout
+    cart_data = session.get('cart')
+    
+    # Chặn nếu nhảy vào link này mà chưa chọn vé
+    if not cart_data or cart_data['event_id'] != event.id:
+        flash('Giỏ hàng trống. Vui lòng chọn vé trước.', 'error')
+        return redirect(url_for('main.event_detail', event_id=event.id))
+
+    return render_template('checkout.html', event=event, cart=cart_data)

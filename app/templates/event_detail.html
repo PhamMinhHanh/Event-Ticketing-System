@@ -145,8 +145,9 @@
                                 <div class="d-flex justify-content-end align-items-center">
                                     <span class="me-2">Số lượng</span>
                                     <input type="number" class="form-control form-control-sm ticket-qty" 
-                                           style="width: 70px;" min="0" max="{{ available }}" value="0"
-                                           data-name="{{ ticket.name }}" data-price="{{ ticket.price }}">
+                                        style="width: 70px;" min="0" max="{{ available }}" value="0"
+                                        name="ticket_{{ ticket.id }}" 
+                                        form="order-form"  data-name="{{ ticket.name }}" data-price="{{ ticket.price }}">
                                 </div>
                             {% else %}
                                 <span class="badge-sold-out">Hết vé</span>
@@ -165,24 +166,26 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="card-custom p-4 sidebar-sticky">
-                <h3 class="section-title">Thông tin đặt vé</h3>
-                
-                <div id="order-items-container">
-                    <div class="text-muted small text-center my-3" id="empty-cart-msg">Chưa có vé nào được chọn.</div>
-                </div>
+            <form action="{{ url_for('main.checkout', event_id=event.id) }}" method="POST" id="order-form">
+                <div class="card-custom p-4 sidebar-sticky">
+                    <h3 class="section-title">Thông tin đặt vé</h3>
+                    
+                    <div id="order-items-container">
+                        <div class="text-muted small text-center my-3" id="empty-cart-msg">Chưa có vé nào được chọn.</div>
+                    </div>
 
-                <div class="summary-total">
-                    <span>Tạm tính</span>
-                    <span class="price-highlight" id="total-price">0đ</span>
-                </div>
+                    <div class="summary-total">
+                        <span>Tạm tính</span>
+                        <span class="price-highlight" id="total-price">0đ</span>
+                    </div>
 
-                <button class="btn-checkout" onclick="alert('Tính năng thanh toán sẽ được hoàn thiện ở Cột mốc sau!')">Tiếp tục đặt vé</button>
-                <button class="btn-contact">Liên hệ ban tổ chức</button>
-                <small class="text-muted d-block text-center mt-3" style="font-size: 0.8rem;">Vé điện tử sẽ được gửi sau khi đặt vé thành công.</small>
-            </div>
+                    <button type="submit" class="btn-checkout">Tiếp tục đặt vé</button>
+                    <button type="button" class="btn-contact">Liên hệ ban tổ chức</button>
+                    <small class="text-muted d-block text-center mt-3" style="font-size: 0.8rem;">Vé điện tử sẽ được gửi sau khi đặt vé thành công.</small>
+                </div>
+            </form>
         </div>
-        </div>
+    </div>
 </div>
 {% endblock %}
 
