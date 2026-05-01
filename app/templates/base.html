@@ -50,7 +50,9 @@
                                 {% set current_role = session['user_role'] | string %}
                                 
                                 {% if 'USER' in current_role %}
-                                    <li><a class="dropdown-item" href="#">🎟️ Vé của tôi</a></li>
+                                    <li><a class="dropdown-item fw-medium" href="{{ url_for('main.my_tickets') }}">
+                                        <i class="bi bi-ticket-detailed text-primary"></i> 🎟️ Vé của tôi
+                                    </a></li>
                                 {% elif 'ORGANIZER' in current_role %}
                                     <li><a class="dropdown-item" href="#">⚙️ Quản lý sự kiện</a></li>
                                     <li><a class="dropdown-item" href="#">📊 Thống kê doanh thu</a></li>

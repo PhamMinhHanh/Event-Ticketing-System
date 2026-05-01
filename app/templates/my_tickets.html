@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Vé của tôi - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <h2 class="fw-bold mb-4">Vé của tôi</h2>
+
+    {% if my_events %}
+        {% for item in my_events %}
+        <div class="card shadow-sm border-0 mb-5" style="border-radius: 1rem; overflow: hidden;">
+            <!-- Header Sự kiện -->
+            <div class="card-header bg-dark text-white p-4">
+                <h4 class="mb-1 fw-bold">{{ item.event_title }}</h4>
+                <div class="small text-light opacity-75">
+                    <i class="bi bi-geo-alt me-1"></i> {{ item.location }} &nbsp;|&nbsp;
+                    <i class="bi bi-clock me-1"></i> {{ item.start_time }} &nbsp;|&nbsp;
+                    <i class="bi bi-receipt me-1"></i> Mã đơn: {{ item.order_code }}
+                </div>
+            </div>
+            
+            <!-- Danh sách Vé -->
+            <div class="card-body p-4 bg-light">
+                <div class="row g-4">
+                    {% for ticket in item.tickets %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="bg-white border rounded shadow-sm text-center position-relative" style="border-style: dashed !important; border-width: 2px !important;">
+                            <!-- Dùng API công khai để render QR Code ngay lập tức -->
+                            <div class="p-3">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ ticket.qr_token }}" 
+                                     alt="QR Code" class="img-fluid mb-3 rounded" style="width: 150px; height: 150px;">
+                                
+                                <h5 class="fw-bold mb-1 text-primary">{{ ticket.type_name }}</h5>
+                                <p class="text-muted small mb-2">Mã vé: <span class="fw-medium text-dark">{{ ticket.code }}</span></p>
+                                
+                                {% if ticket.status == 'ISSUED' %}
+                                    <span class="badge bg-success px-3 py-2 rounded-pill">Chưa Check-in</span>
+                                {% else %}
+                                    <span class="badge bg-secondary px-3 py-2 rounded-pill">Đã Check-in</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <!-- Giao diện khi chưa có vé -->
+        <div class="text-center py-5">
+            <i class="bi bi-ticket-perforated text-muted" style="font-size: 5rem;"></i>
+            <h4 class="mt-3 text-muted">Bạn chưa có vé nào.</h4>
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary mt-3 px-4 py-2 rounded-pill">Khám phá sự kiện ngay</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
