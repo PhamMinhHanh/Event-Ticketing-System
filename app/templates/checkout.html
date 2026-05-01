@@ -9,7 +9,7 @@
             <h3 class="mb-4 fw-bold">Thông tin nhận vé</h3>
             <div class="card shadow-sm border-0 mb-4" style="border-radius: 1rem;">
                 <div class="card-body p-4">
-                    <form action="#" method="POST" id="checkout-form">
+                    <form action="{{ url_for('main.process_checkout', event_id=event.id) }}" method="POST" id="checkout-form">
                         <div class="mb-3">
                             <label class="form-label text-muted fw-medium">Họ và tên</label>
                             <input type="text" class="form-control p-2" name="full_name" 
@@ -27,12 +27,12 @@
                         </div>
                         <hr class="my-4">
                         <h5 class="fw-bold mb-3">Phương thức thanh toán</h5>
-                        <div class="form-check border rounded p-3 mb-2">
+                        <!-- <div class="form-check border rounded p-3 mb-2">
                             <input class="form-check-input ms-1" type="radio" name="payment_method" value="MOMO" id="momo" checked>
                             <label class="form-check-label ms-2" for="momo">Ví MoMo</label>
-                        </div>
+                        </div> -->
                         <div class="form-check border rounded p-3">
-                            <input class="form-check-input ms-1" type="radio" name="payment_method" value="VNPAY" id="vnpay">
+                            <input class="form-check-input ms-1" type="radio" name="payment_method" value="VNPAY" id="vnpay" checked>
                             <label class="form-check-label ms-2" for="vnpay">VNPAY (Thẻ ATM/Visa)</label>
                         </div>
                     </form>

@@ -1,6 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from app import db
-from app.models import User, Organizer, Event, Category, TicketType
+from app.models import User, Organizer, Event, Category, TicketType,  Order, OrderItem, Ticket
+import time
+from datetime import datetime
+from app.vnpay import vnpay 
+import uuid
 
 # Khởi tạo Blueprint thay vì gọi trực tiếp biến 'app'
 main_bp = Blueprint('main', __name__)
@@ -170,3 +174,177 @@ def checkout(event_id):
         return redirect(url_for('main.event_detail', event_id=event.id))
 
     return render_template('checkout.html', event=event, cart=cart_data)
+
+# XỬ LÝ THANH TOÁN VN PAY
+@main_bp.route('/process_checkout/<int:event_id>', methods=['POST'])
+def process_checkout(event_id):
+    if 'user_id' not in session:
+        return redirect(url_for('main.login'))
+
+    cart_data = session.get('cart')
+    if not cart_data or cart_data['event_id'] != event_id:
+        flash('Giỏ hàng không hợp lệ.', 'error')
+        return redirect(url_for('main.event_detail', event_id=event_id))
+
+    # 1. Tạo mã đơn hàng duy nhất (Ví dụ: EVB-20260429153012)
+    order_code = f"EVB-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    total_amount = cart_data['total_amount']
+
+    # 2. Lưu Đơn hàng (Order) vào Database với trạng thái PENDING
+    new_order = Order(
+        order_code=order_code,
+        user_id=session['user_id'],
+        event_id=event_id,
+        status='PENDING',
+        total_amount=total_amount,
+        final_amount=total_amount
+    )
+    db.session.add(new_order)
+    db.session.commit() # Commit để lấy được new_order.id
+
+    # 3. Lưu Chi tiết đơn hàng (Order Items) và trừ số lượng vé
+    for item in cart_data['items']:
+        order_item = OrderItem(
+            order_id=new_order.id,
+            ticket_type_id=item['ticket_type_id'],
+            quantity=item['quantity'],
+            unit_price=item['price'],
+            line_total=item['subtotal']
+        )
+        db.session.add(order_item)
+        
+        # Cập nhật số vé đã bán
+        ticket_type = TicketType.query.get(item['ticket_type_id'])
+        if ticket_type:
+            ticket_type.quantity_sold += item['quantity']
+
+    db.session.commit()
+
+    # Xóa giỏ hàng khỏi session vì đã tạo đơn thành công
+    session.pop('cart', None)
+
+    # 4. CHUẨN BỊ DỮ LIỆU GỬI SANG VNPAY
+    vnp = vnpay()
+    vnp.requestData['vnp_Version'] = '2.1.0'
+    vnp.requestData['vnp_Command'] = 'pay'
+    vnp.requestData['vnp_TmnCode'] = current_app.config['VNPAY_TMN_CODE']
+    
+    # Lưu ý: VNPAY yêu cầu số tiền phải nhân với 100 (Bỏ phần thập phân)
+    vnp.requestData['vnp_Amount'] = int(total_amount * 100) 
+    
+    vnp.requestData['vnp_CurrCode'] = 'VND'
+    vnp.requestData['vnp_TxnRef'] = order_code
+    vnp.requestData['vnp_OrderInfo'] = f"Thanh toan ve su kien {event_id} ma don {order_code}"
+    vnp.requestData['vnp_OrderType'] = 'billpayment'
+    vnp.requestData['vnp_Locale'] = 'vn'
+    
+    # Thời gian tạo giao dịch
+    vnp.requestData['vnp_CreateDate'] = datetime.now().strftime('%Y%m%d%H%M%S')
+    vnp.requestData['vnp_IpAddr'] = request.remote_addr
+    vnp.requestData['vnp_ReturnUrl'] = current_app.config['VNPAY_RETURN_URL']
+
+    # 5. TẠO LINK VÀ CHUYỂN HƯỚNG
+    vnpay_payment_url = vnp.get_payment_url(
+        current_app.config['VNPAY_PAYMENT_URL'], 
+        current_app.config['VNPAY_HASH_SECRET']
+    )
+    
+    return redirect(vnpay_payment_url)
+
+# Trả kết quả VN Pay
+@main_bp.route('/vnpay_return')
+def vnpay_return():
+    vnp = vnpay()
+    # Lấy toàn bộ dữ liệu VNPAY trả về trên URL
+    vnp.responseData = request.args.to_dict()
+    
+    # Lấy mã đơn hàng và mã kết quả
+    order_code = request.args.get('vnp_TxnRef')
+    vnp_ResponseCode = request.args.get('vnp_ResponseCode')
+
+    # Lấy chuỗi bí mật từ config
+    secret_key = current_app.config['VNPAY_HASH_SECRET']
+
+    # 1. Kiểm tra chữ ký bảo mật (đảm bảo không ai giả mạo URL)
+    if vnp.validate_response(secret_key):
+        order = Order.query.filter_by(order_code=order_code).first()
+        
+        if order:
+            # 2. Mã 00 nghĩa là khách hàng đã thanh toán thành công
+            if vnp_ResponseCode == '00':
+                # Chỉ xử lý nếu đơn hàng đang ở trạng thái PENDING (tránh việc F5 trang bị sinh vé nhiều lần)
+                if order.status == 'PENDING':
+                    order.status = 'PAID'
+                    
+                    # Truy xuất các dòng chi tiết của đơn hàng này
+                    order_items = OrderItem.query.filter_by(order_id=order.id).all()
+                    
+                    # Phát hành vé tương ứng với số lượng từng loại
+                    for item in order_items:
+                        for _ in range(item.quantity):
+                            # Tạo mã hiển thị trên vé (VD: TK-5-A1B2C3D4)
+                            ticket_code = f"TK-{order.id}-{uuid.uuid4().hex[:8].upper()}"
+                            
+                            # Tạo chuỗi bí mật để render ra mã QR (Dùng UUID nguyên bản)
+                            qr_token = str(uuid.uuid4())
+                            
+                            new_ticket = Ticket(
+                                ticket_code=ticket_code,
+                                order_item_id=item.id,
+                                qr_token=qr_token,
+                                status='ISSUED'
+                            )
+                            db.session.add(new_ticket)
+                    
+                    # Lưu tất cả vé vào cơ sở dữ liệu
+                    db.session.commit()
+                    flash(f'Thanh toán thành công! Mã đơn hàng: {order_code}. Vé điện tử đã được phát hành.', 'success')
+                else:
+                    flash(f'Đơn hàng {order_code} đã được xử lý trước đó.', 'info')
+        else:
+            flash('Không tìm thấy thông tin đơn hàng trong hệ thống.', 'error')
+    else:
+        flash('Lỗi bảo mật: Dữ liệu trả về không hợp lệ!', 'error')
+
+    # Đưa người dùng về trang chủ (hoặc trang Lịch sử mua vé sau này)
+    return redirect(url_for('main.index'))
+
+# VÉ CỦA TÔI
+@main_bp.route('/my-tickets')
+def my_tickets():
+    # Chặn người lạ
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập để xem vé!', 'error')
+        return redirect(url_for('main.login'))
+
+    # Lấy danh sách đơn hàng ĐÃ THANH TOÁN của user này, xếp mới nhất lên đầu
+    orders = Order.query.filter_by(user_id=session['user_id'], status='PAID').order_by(Order.created_at.desc()).all()
+    
+    my_events = []
+    for order in orders:
+        event = Event.query.get(order.event_id)
+        order_items = OrderItem.query.filter_by(order_id=order.id).all()
+        
+        ticket_list = []
+        for item in order_items:
+            ticket_type = TicketType.query.get(item.ticket_type_id)
+            # Lấy các vé đã phát hành thuộc dòng đơn hàng này
+            tickets = Ticket.query.filter_by(order_item_id=item.id).all()
+            for t in tickets:
+                ticket_list.append({
+                    'code': t.ticket_code,
+                    'type_name': ticket_type.name,
+                    'qr_token': t.qr_token,
+                    'status': t.status
+                })
+        
+        if ticket_list:
+            my_events.append({
+                'order_code': order.order_code,
+                'event_title': event.title,
+                'start_time': event.start_time.strftime('%d/%m/%Y %H:%M'),
+                'location': event.location,
+                'tickets': ticket_list
+            })
+
+    return render_template('my_tickets.html', my_events=my_events)
