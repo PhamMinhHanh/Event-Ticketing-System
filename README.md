@@ -18,14 +18,17 @@
 Dự án được phát triển theo từng giai đoạn (Milestones).
 
 ### Cột mốc hiện tại
-- [x] **Duyệt và tìm kiếm sự kiện:** Lọc sự kiện theo danh mục, tìm kiếm theo từ khóa.
-- [x] **Xem chi tiết sự kiện:** Hiển thị thông tin mô tả, thời gian, địa điểm.
+- [x] **Duyệt và tìm kiếm sự kiện:** Lọc sự kiện theo danh mục, địa điểm, tìm kiếm theo từ khóa.
+- [x] **Xem chi tiết sự kiện:** Hiển thị thông tin mô tả, thời gian, địa điểm, ...
 - [x] **Khám phá loại vé:** Tích hợp bộ đếm hiển thị số lượng vé còn lại và giá vé.
+- [x] **Quét vé Check-in (Mã QR):** Quét QR Code.
+- [x] **Thanh toán online VNPay:** Tích hợp Payment Gateway.
+- [x] **Tạo sự kiện:** Tạo mới sự kiện.
 
-### Cột mốc tiếp theo (Các tính năng sắp phát triển)
-- [ ] **Thanh toán online & Hoàn tiền:** Tích hợp Payment Gateway.
-- [ ] **Tạo và quản lý sự kiện:** Thống kê doanh thu, cấu hình vé.
-- [ ] **Quét vé Check-in:** Hỗ trợ QR Code và nhận diện khuôn mặt (FaceID).
+### Cột mốc tiếp theo (Các tính năng sắp và đang phát triển)
+- [ ] **Hoàn tiền:** Tích hợp Payment Gateway.
+- [ ] **Quản lý sự kiện:** Sửa sự kiện, Thống kê doanh thu, cấu hình vé.
+- [ ] **Quét vé Check-in (Face ID):** Quét nhận diện khuôn mặt.
 - [ ] **Gợi ý sự kiện:** Đề xuất cá nhân hóa dựa trên lịch sử tương tác.
 - [ ] **Dynamic Pricing:** Điều chỉnh giá vé tự động theo nhu cầu.
 
@@ -99,17 +102,29 @@ Mở trình duyệt: http://127.0.0.1:5000
 Event-Ticketing-System/
 │
 ├── app/
-│   ├── __init__.py       # Khởi tạo Flask app & kết nối DB
-│   ├── models.py         # Định nghĩa cấu trúc các bảng CSDL (Entities)
-│   ├── routes.py         # Xử lý logic điều hướng và gọi Controller
-│   └── templates/        # Giao diện HTML (Jinja2)
-│       ├── index.html
-│       ├── login.html
-│       └── event_detail.html
+│   ├── __init__.py           # Khởi tạo Flask app & kết nối Cơ sở dữ liệu
+│   ├── models.py             # Định nghĩa cấu trúc các bảng (User, Event, Ticket, Checkin...)
+│   ├── routes.py             # Xử lý logic điều hướng, API và Thanh toán VNPAY
+│   │
+│   ├── static/               # Thư mục chứa các tệp tĩnh (CSS, JS, Hình ảnh)
+│   │   └── uploads/
+│   │       └── banners/      # Nơi lưu trữ ảnh bìa sự kiện do Organizer tải lên
+│   │
+│   └── templates/            # Giao diện HTML (Sử dụng cú pháp Jinja2)
+│       ├── base.html             # Layout gốc (Chứa Navbar, Footer dùng chung)
+│       ├── index.html            # Trang chủ & Tìm kiếm sự kiện
+│       ├── login.html            # Trang đăng nhập
+│       ├── register.html         # Trang đăng ký tài khoản
+│       ├── event_detail.html     # Trang chi tiết sự kiện & Chọn vé
+│       ├── checkout.html         # Trang xác nhận đơn hàng & Chuyển hướng VNPAY
+│       ├── my_tickets.html       # Trang "Vé của tôi" (Hiển thị mã QR cho người mua)
+│       ├── create_event.html     # Form tạo sự kiện mới (Dành cho Organizer)
+│       ├── manage_events.html    # Bảng quản lý sự kiện (Dành cho Organizer)
+│       └── checkin_scanner.html  # Màn hình mở Camera quét mã QR (Dành cho Organizer)
 │
-├── .venv/                # Môi trường ảo (Đã được gitignore)
-├── config.py             # Cấu hình hệ thống & Database
-├── requirements.txt      # Danh sách thư viện cần thiết
-├── run.py                # File khởi chạy ứng dụng chính
-└── seed.py               # Script tự động tạo dữ liệu mẫu (Mock Data)
+├── .venv/                    # Môi trường ảo chứa thư viện Python (Đã Gitignore)
+├── config.py                 # Cấu hình hệ thống, Database, và API Key VNPAY
+├── requirements.txt          # Danh sách thư viện (Flask, SQLAlchemy, PyMySQL...)
+├── run.py                    # File khởi chạy ứng dụng web chính
+└── seed.py                   # Script tự động làm sạch DB và tạo dữ liệu mẫu
 ```
