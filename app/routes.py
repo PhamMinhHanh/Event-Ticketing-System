@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, jsonify
 from app import db
-from app.models import User, Organizer, Event, Category, TicketType,  Order, OrderItem, Ticket
+from app.models import User, Organizer, Event, Category, TicketType,  Order, OrderItem, Ticket, Checkin
 import time
 from datetime import datetime
 from app.vnpay import vnpay 
@@ -348,3 +348,82 @@ def my_tickets():
             })
 
     return render_template('my_tickets.html', my_events=my_events)
+
+# CHECKIN
+@main_bp.route('/event/<int:event_id>/checkin-scanner')
+def checkin_scanner(event_id):
+    # Chỉ cho phép Organizer truy cập
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập!', 'error')
+        return redirect(url_for('main.login'))
+            
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'ORGANIZER':
+        flash('Bạn không có quyền truy cập trang này!', 'error')
+        return redirect(url_for('main.index'))
+    
+    event = Event.query.get_or_404(event_id)
+    
+    # Đảm bảo Organizer này là chủ nhân của sự kiện
+    if event.organizer_id != session['user_id']:
+        flash('Bạn không phải ban tổ chức của sự kiện này!', 'error')
+        return redirect(url_for('main.index'))
+        
+    return render_template('checkin_scanner.html', event=event)
+
+@main_bp.route('/api/checkin', methods=['POST'])
+def api_checkin():
+    # 1. Kiểm tra quyền (Chỉ Organizer mới được check-in) - Truy vấn trực tiếp role từ Database
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Vui lòng đăng nhập!'}), 401
+        
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'ORGANIZER':
+        return jsonify({'success': False, 'message': 'Bạn không có quyền thực hiện thao tác này!'}), 403
+
+    # 2. Lấy dữ liệu JavaScript gửi lên
+    data = request.get_json()
+    qr_token = data.get('qr_token')
+    event_id = data.get('event_id')
+
+    if not qr_token or not event_id:
+        return jsonify({'success': False, 'message': 'Thiếu dữ liệu mã QR hoặc ID sự kiện!'})
+
+    # 3. Tìm vé theo mã QR
+    ticket = Ticket.query.filter_by(qr_token=qr_token).first()
+    if not ticket:
+        return jsonify({'success': False, 'message': 'Mã QR không hợp lệ hoặc không tồn tại!'})
+
+    # 4. Kiểm tra xem vé này có thuộc về sự kiện đang tổ chức không
+    order_item = OrderItem.query.get(ticket.order_item_id)
+    order = Order.query.get(order_item.order_id)
+    
+    if order.event_id != int(event_id):
+        return jsonify({'success': False, 'message': 'Vé này KHÔNG thuộc về sự kiện hiện tại!'})
+
+    # 5. Kiểm tra trạng thái vé
+    if ticket.status == 'CHECKED_IN':
+        return jsonify({'success': False, 'message': 'CẢNH BÁO: Vé này ĐÃ ĐƯỢC SỬ DỤNG trước đó!'})
+    elif ticket.status != 'ISSUED':
+        return jsonify({'success': False, 'message': f'Trạng thái vé không hợp lệ ({ticket.status})!'})
+
+    # 6. THÀNH CÔNG: Cập nhật trạng thái vé và ghi Log
+    ticket.status = 'CHECKED_IN'
+    
+    new_checkin = Checkin(
+        ticket_id=ticket.id,
+        checked_in_by=session['user_id'],
+        checkin_method='QR',
+        result='SUCCESS'
+    )
+    db.session.add(new_checkin)
+    db.session.commit()
+
+    ticket_type = TicketType.query.get(order_item.ticket_type_id)
+
+    return jsonify({
+        'success': True,
+        'message': 'Hợp lệ! Mời khách vào.',
+        'ticket_code': ticket.ticket_code,
+        'ticket_type': ticket_type.name
+    })
