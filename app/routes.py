@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 from app.vnpay import vnpay 
 import uuid
+import os
+from werkzeug.utils import secure_filename
 
 # Khởi tạo Blueprint thay vì gọi trực tiếp biến 'app'
 main_bp = Blueprint('main', __name__)
@@ -427,3 +429,121 @@ def api_checkin():
         'ticket_code': ticket.ticket_code,
         'ticket_type': ticket_type.name
     })
+
+# ============================= [ TẠO SỰ KIỆN ] ========================================
+@main_bp.route('/organizer/event/create', methods=['GET', 'POST'])
+def create_event():
+    # Kiểm tra quyền Organizer
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập!', 'error')
+        return redirect(url_for('main.login'))
+        
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'ORGANIZER':
+        flash('Chỉ Ban tổ chức mới có quyền tạo sự kiện!', 'error')
+        return redirect(url_for('main.index'))
+
+    if request.method == 'POST':
+        # 1. Lấy dữ liệu thông tin sự kiện
+        title = request.form.get('title')
+        location = request.form.get('location')
+        province = request.form.get('province')
+        description = request.form.get('description')
+        category_id = request.form.get('category')
+        start_time_str = request.form.get('start_time')
+        end_time_str = request.form.get('end_time')
+
+        # Chuyển đổi chuỗi thời gian HTML thành đối tượng datetime của Python
+        start_time = datetime.strptime(start_time_str, '%Y-%m-%dT%H:%M')
+        end_time = datetime.strptime(end_time_str, '%Y-%m-%dT%H:%M')
+
+        # 2. Xử lý Upload Ảnh
+        banner_file = request.files.get('banner')
+        banner_filename = 'default_banner.jpg' # Tên mặc định nếu lỗi
+
+        if banner_file and banner_file.filename != '':
+            # Dùng secure_filename để xóa bỏ các ký tự độc hại trong tên file
+            filename = secure_filename(banner_file.filename)
+            # Thêm timestamp để tên file không bao giờ bị trùng
+            unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+            
+            # Đảm bảo thư mục upload tồn tại
+            upload_folder = current_app.config['UPLOAD_FOLDER']
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # Lưu file vào ổ cứng
+            file_path = os.path.join(upload_folder, unique_filename)
+            banner_file.save(file_path)
+            
+            # Chỉ lưu đường dẫn tương đối vào database để render trên web
+            banner_filename = f"uploads/banners/{unique_filename}"
+
+        # 3. Tạo Sự kiện mới
+        new_event = Event(
+            title=title,
+            description=description,
+            location=location,
+            province=province,
+            start_time=start_time,
+            end_time=end_time,
+            banner_url=banner_filename,
+            organizer_id=current_user.id,
+            category_id=category_id,
+            status='PUBLISHED'
+        )
+        db.session.add(new_event)
+        db.session.flush() # flush để lấy được new_event.id lập tức mà chưa cần commit
+
+        # 4. Lưu các loại vé từ Form (Sử dụng getlist vì input có name là mảng ticket_names[])
+        ticket_names = request.form.getlist('ticket_names[]')
+        ticket_prices = request.form.getlist('ticket_prices[]')
+        ticket_quantities = request.form.getlist('ticket_quantities[]')
+
+        # Vòng lặp zip() giúp duyệt song song 3 mảng cùng lúc
+        for name, price, quantity in zip(ticket_names, ticket_prices, ticket_quantities):
+            if name.strip(): # Bỏ qua nếu tên vé bị rỗng
+                new_ticket_type = TicketType(
+                    event_id=new_event.id,
+                    name=name,
+                    price=float(price),
+                    quantity_total=int(quantity),
+                    quantity_sold=0
+                )
+                db.session.add(new_ticket_type)
+
+        # TÌM VÀ CẬP NHẬT GIÁ RẺ NHẤT
+        # Lọc ra các mức giá hợp lệ (bỏ qua ô trống) và ép kiểu số thực
+        valid_prices = [float(p) for p in ticket_prices if p.strip()]
+        if valid_prices:
+            new_event.base_price = min(valid_prices) # Tìm giá nhỏ nhất
+        else:
+            new_event.base_price = 0
+
+        # Lưu toàn bộ vào Database
+        db.session.commit()
+        flash('Tạo sự kiện thành công!', 'success')
+        
+        # Tạo xong thì đẩy ra trang chi tiết sự kiện vừa tạo để xem thành quả
+        return redirect(url_for('main.event_detail', event_id=new_event.id))
+
+    # Nếu là GET thì hiển thị trang form
+    categories = Category.query.all()
+    return render_template('create_event.html', categories=categories)
+
+# ========== Xử lý tìm tất cả các sự kiện thuộc về Ban tổ chức đang đăng nhập ================
+@main_bp.route('/organizer/events')
+def manage_events():
+    # Kiểm tra quyền Organizer
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập!', 'error')
+        return redirect(url_for('main.login'))
+        
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'ORGANIZER':
+        flash('Chỉ Ban tổ chức mới có quyền truy cập trang này!', 'error')
+        return redirect(url_for('main.index'))
+
+    # Lấy danh sách sự kiện do chính người này tạo, sắp xếp mới nhất lên đầu
+    my_events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.id.desc()).all()
+    
+    return render_template('manage_events.html', events=my_events)

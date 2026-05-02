@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}Tạo sự kiện mới - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <h2 class="fw-bold mb-4">Tạo sự kiện mới</h2>
+    
+    <form action="{{ url_for('main.create_event') }}" method="POST" enctype="multipart/form-data" class="needs-validation">
+        <div class="row">
+            <!-- Cột trái: Thông tin cơ bản -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 mb-4 rounded-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Thông tin chung</h5>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Tên sự kiện <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="title" required placeholder="VD: Lễ hội âm nhạc mùa hè">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Thể loại sự kiện <span class="text-danger">*</span></label>
+                            <select class="form-select" name="category" required>
+                                <option value="" disabled selected>Chọn thể loại...</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-medium">Thời gian bắt đầu <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control" name="start_time" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-medium">Thời gian kết thúc <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control" name="end_time" required>
+                            </div>
+                        </div>
+
+                        <!-- <div class="mb-3">
+                            <label class="form-label fw-medium">Địa điểm <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="location" required placeholder="VD: Sân vận động Mỹ Đình">
+                        </div> -->
+
+                        <div class="row">
+                            <!-- Chọn Tỉnh/Thành phố -->
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label fw-medium">Khu vực <span class="text-danger">*</span></label>
+                                <select class="form-select" name="province" required>
+                                    <option value="" disabled selected>Chọn Tỉnh/Thành phố</option>
+                                    <option value="Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                                    <option value="Hà Nội">Hà Nội</option>
+                                    <option value="Đà Nẵng">Đà Nẵng</option>
+                                    <option value="Cần Thơ">Cần Thơ</option>
+                                    <option value="Hải Phòng">Hải Phòng</option>
+                                    <option value="Đồng Nai">Đồng Nai</option>
+                                    <option value="Bình Dương">Bình Dương</option>
+                                    <option value="Khác">Tỉnh/Thành phố khác...</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Nhập Địa điểm chi tiết -->
+                            <div class="col-md-7 mb-3">
+                                <label class="form-label fw-medium">Địa điểm chi tiết <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="location" required placeholder="VD: Sân vận động Mỹ Đình, Nam Từ Liêm">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Ảnh Banner (Tối đa 5MB) <span class="text-danger">*</span></label>
+                            <input type="file" class="form-control" name="banner" accept="image/*" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Mô tả sự kiện</label>
+                            <textarea class="form-control" name="description" rows="5" placeholder="Giới thiệu về sự kiện của bạn..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cột phải: Thiết lập vé -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 rounded-4 sticky-top" style="top: 20px;">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Các loại vé</h5>
+                        
+                        <div id="ticket-container">
+                            <!-- Dòng vé mặc định -->
+                            <div class="ticket-row border rounded p-3 mb-3 bg-light position-relative">
+                                <div class="mb-2">
+                                    <label class="form-label small fw-medium">Tên loại vé <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-sm" name="ticket_names[]" required placeholder="VD: Vé Thường">
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label class="form-label small fw-medium">Giá vé (VNĐ) <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-sm" name="ticket_prices[]" required min="0" value="0">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small fw-medium">Số lượng <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-sm" name="ticket_quantities[]" required min="1" value="100">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100 mb-4" id="btn-add-ticket">
+                            <i class="bi bi-plus-circle"></i> Thêm loại vé khác
+                        </button>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold rounded-pill">
+                            Tạo sự kiện ngay
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Script thêm dòng vé động -->
+<script>
+document.getElementById('btn-add-ticket').addEventListener('click', function() {
+    const container = document.getElementById('ticket-container');
+    const newRow = document.createElement('div');
+    newRow.className = 'ticket-row border rounded p-3 mb-3 bg-light position-relative';
+    newRow.innerHTML = `
+        <button type="button" class="btn-close position-absolute top-0 end-0 m-2 btn-remove-ticket" aria-label="Close"></button>
+        <div class="mb-2">
+            <label class="form-label small fw-medium">Tên loại vé <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" name="ticket_names[]" required>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                <label class="form-label small fw-medium">Giá vé (VNĐ) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-sm" name="ticket_prices[]" required min="0" value="0">
+            </div>
+            <div class="col-6">
+                <label class="form-label small fw-medium">Số lượng <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-sm" name="ticket_quantities[]" required min="1">
+            </div>
+        </div>
+    `;
+    container.appendChild(newRow);
+
+    // Kích hoạt nút xóa cho dòng mới
+    newRow.querySelector('.btn-remove-ticket').addEventListener('click', function() {
+        newRow.remove();
+    });
+});
+</script>
+{% endblock %}

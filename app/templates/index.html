@@ -58,7 +58,12 @@
         <div class="col-md-6 col-lg-3 mb-4">
             <div class="card event-card h-100 border-0 shadow-sm">
                 {% if event.banner_url %}
-                    <img src="{{ event.banner_url }}" class="card-img-top" alt="{{ event.title }}" style="height: 150px; object-fit: cover;">
+                    <!-- Dùng Jinja2 kiểm tra: Nếu link có chữ http thì dùng luôn, nếu không thì gọi từ thư mục static -->
+                    {% if event.banner_url.startswith('http') %}
+                        <img src="{{ event.banner_url }}" class="img-fluid w-100 rounded-top" alt="{{ event.title }}">
+                    {% else %}
+                        <img src="{{ url_for('static', filename=event.banner_url) }}" class="img-fluid w-100 rounded-top" alt="{{ event.title }}">
+                    {% endif %}
                 {% else %}
                     <div class="card-img-placeholder">Image cap</div>
                 {% endif %}

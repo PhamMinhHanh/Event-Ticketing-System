@@ -79,7 +79,12 @@
 <div class="container mt-4">
     <div class="card-custom row g-0">
         <div class="col-md-6">
-            <img src="{{ event.banner_url or 'https://via.placeholder.com/800x600' }}" class="hero-img" alt="{{ event.title }}">
+            <!-- Dùng Jinja2 kiểm tra: Nếu link có chữ http thì dùng luôn, nếu không thì gọi từ thư mục static -->
+            {% if event.banner_url.startswith('http') %}
+                <img src="{{ event.banner_url }}" class="img-fluid w-100 rounded-top" alt="{{ event.title }}">
+            {% else %}
+                <img src="{{ url_for('static', filename=event.banner_url) }}" class="img-fluid w-100 rounded-top" alt="{{ event.title }}">
+            {% endif %}
         </div>
         <div class="col-md-6 p-4 p-lg-5">
             <div class="status-badge">Đang mở bán</div>
