@@ -58,7 +58,11 @@
                                     </a>
                                     
                                     {% if event.status != 'CANCELLED' %}
-                                        <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã QR Check-in">
+                                        <a href="{{ url_for('main.edit_event', event_id=event.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Chỉnh sửa">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+
+                                        <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã Check-in">
                                             <i class="bi bi-qr-code-scan"></i> Soát vé
                                         </a>
                                         <!-- Gọi API hoặc Route để hủy -->

@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}Thống kê doanh thu - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Tổng quan kinh doanh</h2>
+        <a href="{{ url_for('main.manage_events') }}" class="btn btn-outline-primary"><i class="bi bi-list-task me-2"></i>Quản lý sự kiện</a>
+    </div>
+
+    <!-- 3 THẺ TỔNG QUAN (SUMMARY CARDS) -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-primary bg-opacity-10">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                        <i class="bi bi-calendar2-check"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">Tổng sự kiện</h6>
+                        <h3 class="fw-bold mb-0 text-primary">{{ total_events }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-success bg-opacity-10">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="bg-success text-white rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                        <i class="bi bi-ticket-perforated"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">Tổng vé đã bán</h6>
+                        <h3 class="fw-bold mb-0 text-success">{{ total_tickets_sold }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-warning bg-opacity-10">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="bg-warning text-dark rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                        <i class="bi bi-cash-coin"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">Tổng doanh thu</h6>
+                        <h3 class="fw-bold mb-0 text-dark">{{ "{:,.0f}".format(total_revenue).replace(',', '.') }} đ</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHU VỰC VẼ BIỂU ĐỒ -->
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+            <h5 class="fw-bold"><i class="bi bi-graph-up-arrow text-success me-2"></i>Biểu đồ doanh thu theo sự kiện</h5>
+        </div>
+        <div class="card-body px-4 pb-4">
+            <!-- Thẻ Canvas để Chart.js vẽ lên -->
+            <canvas id="revenueChart" height="100"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Nhúng thư viện Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- TẠO "ĐẢO DỮ LIỆU" ĐỂ TRÁNH LỖI IDE VÀ XSS -->
+<script id="data-labels" type="application/json">
+    {{ chart_labels | safe }}
+</script>
+<script id="data-values" type="application/json">
+    {{ chart_data | safe }}
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Đọc dữ liệu từ "Đảo dữ liệu" bằng JS thuần (VS Code sẽ không báo lỗi nữa)
+        const labels = JSON.parse(document.getElementById('data-labels').textContent);
+        const data = JSON.parse(document.getElementById('data-values').textContent);
+
+        // Cấu hình vẽ biểu đồ Bar Chart (Cột)
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Doanh thu (VNĐ)',
+                    data: data,
+                    backgroundColor: 'rgba(13, 110, 253, 0.7)', // Màu xanh blue của Bootstrap
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5 // Bo góc các cột cho đẹp
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false // Ẩn chú thích để gọn gàng hơn
+                    },
+                    tooltip: {
+                        callbacks: {
+                            // Định dạng số tiền có dấu chấm khi đưa chuột vào biểu đồ
+                            label: function(context) {
+                                let value = context.raw;
+                                return value.toLocaleString('vi-VN') + ' đ';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            // Định dạng trục Y
+                            callback: function(value, index, values) {
+                                if(value >= 1000000) return (value / 1000000) + ' Tr';
+                                if(value >= 1000) return (value / 1000) + ' K';
+                                return value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Sửa sự kiện: {{ event.title }} - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <div class="d-flex align-items-center mb-2">
+                        <a href="{{ url_for('main.manage_events') }}" class="btn btn-sm btn-outline-secondary rounded-circle me-3"><i class="bi bi-arrow-left"></i></a>
+                        <h2 class="fw-bold mb-0">Chỉnh sửa sự kiện</h2>
+                    </div>
+                    <p class="text-muted ms-5">Cập nhật thông tin chi tiết cho sự kiện của bạn.</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form action="{{ url_for('main.edit_event', event_id=event.id) }}" method="POST" enctype="multipart/form-data">
+                        
+                        <!-- TÊN & THỂ LOẠI -->
+                        <div class="row">
+                            <div class="col-md-7 mb-3">
+                                <label class="form-label fw-medium">Tên sự kiện <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="title" required value="{{ event.title }}">
+                            </div>
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label fw-medium">Thể loại <span class="text-danger">*</span></label>
+                                <select class="form-select" name="category" required>
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.id }}" {% if cat.id == event.category_id %}selected{% endif %}>{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- THỜI GIAN SỰ KIỆN -->
+                        <div class="row bg-light p-3 rounded-3 mb-3 mx-0">
+                            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-calendar-event me-2"></i>Thời gian diễn ra sự kiện</h6>
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label small fw-medium">Bắt đầu <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control" name="start_time" required value="{{ event.start_time.strftime('%Y-%m-%dT%H:%M') }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-medium">Kết thúc <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control" name="end_time" required value="{{ event.end_time.strftime('%Y-%m-%dT%H:%M') }}">
+                            </div>
+                        </div>
+                        
+                        <!-- THỜI GIAN BÁN VÉ -->
+                        <div class="row bg-info bg-opacity-10 p-3 rounded-3 mb-3 mx-0">
+                            <h6 class="fw-bold text-info mb-3"><i class="bi bi-ticket-perforated me-2"></i>Thời gian mở bán vé</h6>
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label small fw-medium">Bắt đầu bán <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control" name="sales_start_time" required value="{{ event.sales_start_time.strftime('%Y-%m-%dT%H:%M') if event.sales_start_time else '' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-medium">Kết thúc bán <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control" name="sales_end_time" required value="{{ event.sales_end_time.strftime('%Y-%m-%dT%H:%M') if event.sales_end_time else '' }}">
+                            </div>
+                        </div>
+
+                        <!-- ĐỊA ĐIỂM -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-medium">Tỉnh/Thành phố <span class="text-danger">*</span></label>
+                                <select class="form-select" name="province" required>
+                                    <option value="Hà Nội" {% if event.province == 'Hà Nội' %}selected{% endif %}>Hà Nội</option>
+                                    <option value="TP.HCM" {% if event.province == 'TP.HCM' %}selected{% endif %}>TP.HCM</option>
+                                    <option value="Đà Nẵng" {% if event.province == 'Đà Nẵng' %}selected{% endif %}>Đà Nẵng</option>
+                                    <option value="Ninh Bình" {% if event.province == 'Ninh Bình' %}selected{% endif %}>Ninh Bình</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label fw-medium">Địa chỉ chi tiết <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="location" required value="{{ event.location }}">
+                            </div>
+                        </div>
+
+                        <!-- CHECK-IN -->
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Hình thức Check-in <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="checkin_method" id="checkinQR" value="QR" {% if event.checkin_method == 'QR' %}checked{% endif %}>
+                                    <label class="form-check-label" for="checkinQR"><i class="bi bi-qr-code"></i> Quét mã QR</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="checkin_method" id="checkinFace" value="FACE" {% if event.checkin_method == 'FACE' %}checked{% endif %}>
+                                    <label class="form-check-label" for="checkinFace"><i class="bi bi-person-bounding-box"></i> Nhận diện Face ID</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MÔ TẢ -->
+                        <div class="mb-4">
+                            <label class="form-label fw-medium">Giới thiệu sự kiện <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="5" required>{{ event.description }}</textarea>
+                        </div>
+                        
+                        <!-- ẢNH BANNER -->
+                        <div class="mb-4">
+                            <label class="form-label fw-medium">Ảnh Banner (Bỏ trống nếu không muốn đổi)</label>
+                            
+                            <!-- Hiện ảnh cũ nếu có -->
+                            {% if event.banner_url %}
+                            <div class="mb-2">
+                                <img src="{{ event.banner_url if event.banner_url.startswith('http') else url_for('static', filename=event.banner_url) }}" alt="Current Banner" class="img-thumbnail" style="max-height: 150px;">
+                            </div>
+                            {% endif %}
+                            
+                            <input type="file" class="form-control" name="banner" accept="image/*">
+                        </div>
+
+                        <hr class="my-4">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg fw-bold rounded-pill">Lưu thay đổi</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

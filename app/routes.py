@@ -7,6 +7,7 @@ from app.vnpay import vnpay
 import uuid
 import os
 from werkzeug.utils import secure_filename
+import json
 
 # Khởi tạo Blueprint thay vì gọi trực tiếp biến 'app'
 main_bp = Blueprint('main', __name__)
@@ -571,6 +572,80 @@ def create_event():
     categories = Category.query.all()
     return render_template('create_event.html', categories=categories)
 
+# ============================== [SỬA SỰ KIỆN] ========================================
+@main_bp.route('/organizer/event/<int:event_id>/edit', methods=['GET', 'POST'])
+def edit_event(event_id):
+    # 1. Kiểm tra quyền
+    if 'user_id' not in session or (session.get('role') != 'ORGANIZER' and session.get('user_role') != 'ORGANIZER'):
+        flash('Vui lòng đăng nhập với tài khoản Ban tổ chức!', 'error')
+        return redirect(url_for('main.login'))
+        
+    current_user = User.query.get(session['user_id'])
+    
+    # 2. Lấy sự kiện và kiểm tra xem có đúng của người này tạo không
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != current_user.id:
+        flash('Bạn không có quyền chỉnh sửa sự kiện này!', 'error')
+        return redirect(url_for('main.manage_events'))
+        
+    # Không cho sửa sự kiện đã Hủy hoặc Đã kết thúc (Tùy logic của bạn)
+    if event.status == 'CANCELLED':
+        flash('Không thể chỉnh sửa sự kiện đã hủy!', 'error')
+        return redirect(url_for('main.manage_events'))
+
+    if request.method == 'POST':
+        # 3. Lấy dữ liệu Text từ Form
+        event.title = request.form.get('title')
+        event.category_id = request.form.get('category')
+        event.location = request.form.get('location')
+        event.province = request.form.get('province')
+        event.description = request.form.get('description')
+        event.checkin_method = request.form.get('checkin_method')
+        
+        # 4. Xử lý Thời gian (Nhớ import datetime ở đầu file nếu chưa có)
+        from datetime import datetime
+        event.start_time = datetime.strptime(request.form.get('start_time'), '%Y-%m-%dT%H:%M')
+        event.end_time = datetime.strptime(request.form.get('end_time'), '%Y-%m-%dT%H:%M')
+        event.sales_start_time = datetime.strptime(request.form.get('sales_start_time'), '%Y-%m-%dT%H:%M')
+        event.sales_end_time = datetime.strptime(request.form.get('sales_end_time'), '%Y-%m-%dT%H:%M')
+        
+        # Validate logic thời gian cơ bản
+        if event.sales_start_time >= event.sales_end_time or event.start_time >= event.end_time:
+            flash('Lỗi logic thời gian: Bắt đầu phải trước Kết thúc!', 'error')
+            return redirect(url_for('main.edit_event', event_id=event.id))
+
+        # 5. Xử lý Ảnh Banner mới (Chỉ cập nhật nếu họ chọn file mới)
+        banner_file = request.files.get('banner')
+        if banner_file and banner_file.filename != '':
+            # Tạo đường dẫn lưu ảnh (Giống hàm create_event)
+            upload_dir = os.path.join('app', 'static', 'uploads', 'banners')
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # (Tùy chọn) Xóa ảnh cũ nếu nó là ảnh tự upload, không phải link HTTP
+            if event.banner_url and not event.banner_url.startswith('http'):
+                old_path = os.path.join('app', 'static', event.banner_url)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            
+            # Lưu ảnh mới
+            filename = secure_filename(banner_file.filename)
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            new_filename = f"{timestamp}_{filename}"
+            filepath = os.path.join(upload_dir, new_filename)
+            banner_file.save(filepath)
+            
+            # Cập nhật DB
+            event.banner_url = f"uploads/banners/{new_filename}"
+
+        # Lưu thay đổi vào DB
+        db.session.commit()
+        flash('Cập nhật sự kiện thành công!', 'success')
+        return redirect(url_for('main.manage_events'))
+
+    # NẾU LÀ TRANG GET: Lấy danh sách thể loại để đổ ra form
+    categories = Category.query.all()
+    return render_template('edit_event.html', event=event, categories=categories)
+
 # ========== [Xử lý tìm tất cả các sự kiện thuộc về Ban tổ chức đang đăng nhập] ================
 @main_bp.route('/organizer/events')
 def manage_events():
@@ -588,3 +663,51 @@ def manage_events():
     my_events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.id.desc()).all()
     
     return render_template('manage_events.html', events=my_events, now=datetime.now())
+
+# ============================== [THỐNG KÊ NTC] ==============================
+@main_bp.route('/organizer/dashboard')
+def organizer_dashboard():
+    # 1. Kiểm tra quyền truy cập
+    if 'user_id' not in session or (session.get('role') != 'ORGANIZER' and session.get('user_role') != 'ORGANIZER'):
+        flash('Vui lòng đăng nhập với tài khoản Ban tổ chức!', 'error')
+        return redirect(url_for('main.login'))
+
+    current_user_id = session['user_id']
+    
+    # 2. Lấy tất cả sự kiện của Nhà tổ chức này
+    events = Event.query.filter_by(organizer_id=current_user_id).all()
+
+    # 3. Khởi tạo các biến thống kê
+    total_events = len(events)
+    total_tickets_sold = 0
+    total_revenue = 0
+
+    # Dữ liệu dành cho biểu đồ (Chart.js)
+    chart_labels = [] # Tên sự kiện
+    chart_data = []   # Doanh thu của sự kiện đó
+
+    for event in events:
+        event_revenue = 0
+        event_tickets_sold = 0
+        
+        # Quét qua các loại vé của sự kiện này để cộng dồn
+        for tt in event.ticket_types:
+            sold = tt.quantity_sold
+            price = tt.price
+            event_tickets_sold += sold
+            event_revenue += (sold * price)
+
+        # Cộng vào tổng hệ thống
+        total_tickets_sold += event_tickets_sold
+        total_revenue += event_revenue
+
+        # Đẩy dữ liệu vào mảng vẽ biểu đồ
+        chart_labels.append(event.title)
+        chart_data.append(float(event_revenue))
+
+    return render_template('dashboard.html',
+                           total_events=total_events,
+                           total_tickets_sold=total_tickets_sold,
+                           total_revenue=total_revenue,
+                           chart_labels=json.dumps(chart_labels), # Dùng json.dumps để JS đọc được an toàn
+                           chart_data=json.dumps(chart_data))
