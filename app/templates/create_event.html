@@ -29,21 +29,43 @@
                             </select>
                         </div>
 
+                        <!-- Chọn loại Check-in -->
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Hình thức Check-in <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="checkin_method" id="checkinQR" value="QR" checked>
+                                    <label class="form-check-label" for="checkinQR"><i class="bi bi-qr-code"></i> Quét mã QR</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="checkin_method" id="checkinFace" value="FACE">
+                                    <label class="form-check-label" for="checkinFace"><i class="bi bi-person-bounding-box"></i> Nhận diện Face ID</label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-medium">Thời gian bắt đầu <span class="text-danger">*</span></label>
+                                <label class="form-label fw-medium">Thời gian diễn ra sự kiện<span class="text-danger">*</span></label>
                                 <input type="datetime-local" class="form-control" name="start_time" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-medium">Thời gian kết thúc <span class="text-danger">*</span></label>
+                                <label class="form-label fw-medium">Thời gian kết thúc sự kiện<span class="text-danger">*</span></label>
                                 <input type="datetime-local" class="form-control" name="end_time" required>
                             </div>
                         </div>
 
-                        <!-- <div class="mb-3">
-                            <label class="form-label fw-medium">Địa điểm <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="location" required placeholder="VD: Sân vận động Mỹ Đình">
-                        </div> -->
+                        <!-- Thời gian mở bán vé -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-medium text-primary">Bắt đầu bán vé <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control border-primary" name="sales_start_time" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-medium text-primary">Kết thúc bán vé <span class="text-danger">*</span></label>
+                                <input type="datetime-local" class="form-control border-primary" name="sales_end_time" required>
+                            </div>
+                        </div>
 
                         <div class="row">
                             <!-- Chọn Tỉnh/Thành phố -->

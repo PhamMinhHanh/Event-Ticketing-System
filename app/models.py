@@ -24,9 +24,12 @@ class Event(db.Model):
     end_time = db.Column(db.DateTime, nullable=False)
     banner_url = db.Column(db.String(255), nullable=True)
     base_price = db.Column(db.Numeric(12, 2), default=0)
-    status = db.Column(db.Enum('DRAFT', 'PUBLISHED', 'CLOSED', 'CANCELLED'), default='DRAFT')
+    status = db.Column(db.Enum('PUBLISHED', 'CLOSED', 'CANCELLED'), default='')
     checkin_mode = db.Column(db.Enum('QR', 'FACE', 'BOTH'), default='QR')
     ticket_types = db.relationship('TicketType', backref='event', lazy=True)
+    sales_start_time = db.Column(db.DateTime, nullable=True) # Ngày bắt đầu bán
+    sales_end_time = db.Column(db.DateTime, nullable=True)   # Ngày kết thúc bán
+    checkin_method = db.Column(db.Enum('QR', 'FACE'), default='QR', nullable=False) # Loại check-in
 
 # BẢNG LOẠI VÉ
 class TicketType(db.Model):

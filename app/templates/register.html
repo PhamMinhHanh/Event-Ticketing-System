@@ -55,39 +55,43 @@
 
         <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-pill" id="pills-tab" role="tablist">
             <li class="nav-item">
-                <button class="nav-link active" type="button" onclick="setRole('USER')">Khách hàng</button>
+                <button class="nav-link active" id="tab-user" type="button" onclick="setRole('USER')">Khách hàng</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" type="button" onclick="setRole('ORGANIZER')">Nhà tổ chức</button>
+                <button class="nav-link" id="tab-org" type="button" onclick="setRole('ORGANIZER')">Nhà tổ chức</button>
             </li>
         </ul>
 
         <form action="{{ url_for('main.register') }}" method="POST">
+            <!-- Input ẩn lưu trữ role -->
             <input type="hidden" name="role" id="role-input" value="USER">
-            
-            <div class="mb-3">
-                <label class="form-label">Họ và tên</label>
-                <input type="text" name="full_name" class="form-control" required>
+
+            <!-- Ô Họ và tên (Dành cho USER) -->
+            <div class="mb-3" id="fullname-field">
+                <label class="form-label">Họ và tên <span class="text-danger">*</span></label>
+                <input type="text" name="full_name" class="form-control" id="input-fullname" required>
             </div>
 
+            <!-- Ô Tên tổ chức (Dành cho ORGANIZER - Mặc định ẩn và bị vô hiệu hóa) -->
             <div class="mb-3 d-none" id="org-name-field">
-                <label class="form-label">Tên đơn vị tổ chức</label>
-                <input type="text" name="org_name" class="form-control">
+                <label class="form-label">Tên đơn vị tổ chức <span class="text-danger">*</span></label>
+                <input type="text" name="organization_name" class="form-control" id="input-orgname" disabled required>
             </div>
 
+            <!-- CÁC TRƯỜNG DÙNG CHUNG -->
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Email</label>
+                    <label class="form-label">Email <span class="text-danger">*</span></label>
                     <input type="email" name="email" class="form-control" required>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Số điện thoại</label>
+                    <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
                     <input type="text" name="phone" class="form-control" required>
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="form-label">Mật khẩu</label>
+                <label class="form-label">Mật khẩu <span class="text-danger">*</span></label>
                 <input type="password" name="password" class="form-control" required>
             </div>
 
@@ -104,21 +108,44 @@
 {% block scripts %}
 <script>
     function setRole(role) {
+        // 1. Cập nhật value cho form
         document.getElementById('role-input').value = role;
-        const orgField = document.getElementById('org-name-field');
-        const navLinks = document.querySelectorAll('.nav-link');
-        
-        // Đổi màu tab
-        navLinks.forEach(link => link.classList.remove('active'));
-        event.target.classList.add('active');
 
-        // Hiện/ẩn form nhà tổ chức
-        if(role === 'ORGANIZER') {
-            orgField.classList.remove('d-none');
-            orgField.querySelector('input').setAttribute('required', 'required');
+        // 2. Lấy các elements
+        const tabUser = document.getElementById('tab-user');
+        const tabOrg = document.getElementById('tab-org');
+        
+        const fullnameField = document.getElementById('fullname-field');
+        const inputFullname = document.getElementById('input-fullname');
+        
+        const orgNameField = document.getElementById('org-name-field');
+        const inputOrgname = document.getElementById('input-orgname');
+
+        // 3. Xử lý logic ẩn/hiện và chuyển class "active"
+        if (role === 'USER') {
+            // Chuyển màu Tab
+            tabUser.classList.add('active');
+            tabOrg.classList.remove('active');
+            
+            // Hiện Họ Tên, Bật input Họ tên
+            fullnameField.classList.remove('d-none');
+            inputFullname.disabled = false;
+            
+            // Ẩn Tổ chức, Vô hiệu hóa input Tổ chức
+            orgNameField.classList.add('d-none');
+            inputOrgname.disabled = true;
         } else {
-            orgField.classList.add('d-none');
-            orgField.querySelector('input').removeAttribute('required');
+            // Chuyển màu Tab
+            tabOrg.classList.add('active');
+            tabUser.classList.remove('active');
+            
+            // Hiện Tổ chức, Bật input Tổ chức
+            orgNameField.classList.remove('d-none');
+            inputOrgname.disabled = false;
+            
+            // Ẩn Họ tên, Vô hiệu hóa input Họ tên
+            fullnameField.classList.add('d-none');
+            inputFullname.disabled = true;
         }
     }
 </script>

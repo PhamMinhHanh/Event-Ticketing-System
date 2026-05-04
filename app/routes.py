@@ -20,6 +20,7 @@ def inject_global_vars():
     provinces = [p[0] for p in provinces_data if p[0]]
     return dict(categories=categories, provinces=provinces)
 
+# ===================== [Tìm và lọc tìm kiếm] ========================
 @main_bp.route('/')
 def index():
     keyword = request.args.get('q', '')
@@ -52,12 +53,17 @@ def index():
 
     return render_template('index.html', events=events, categories=categories, provinces=provinces)
 
+# ======================== [CHI TIẾT SỰ KIỆN] ========================
 @main_bp.route('/event/<int:event_id>')
 def event_detail(event_id):
     #Xem chi tiết sự kiện và chọn loại vé
     event = Event.query.get_or_404(event_id)
-    return render_template('event_detail.html', event=event)
+    organizer = User.query.get(event.organizer_id) # Lấy data Ban tổ chức
+    ticket_types = TicketType.query.filter_by(event_id=event.id).all()
 
+    return render_template('event_detail.html', event=event, ticket_types=ticket_types, organizer=organizer, now=datetime.now())
+
+# ======================== [LOGIN] ========================
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -81,6 +87,7 @@ def login():
 
     return render_template('login.html')
 
+# ======================== [LOGOUT] ========================
 @main_bp.route('/logout')
 def logout():
     # Xóa sạch thông tin trong phiên làm việc
@@ -88,14 +95,22 @@ def logout():
     flash('Bạn đã đăng xuất thành công.', 'success')
     return redirect(url_for('main.index'))
 
+# ======================== [ĐĂNG KÝ] ========================
 @main_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         role = request.form.get('role') # 'USER' hoặc 'ORGANIZER'
-        full_name = request.form.get('full_name')
         email = request.form.get('email')
         password = request.form.get('password')
         phone = request.form.get('phone')
+        
+        # Lấy dữ liệu theo role
+        if role == 'ORGANIZER':
+            organization_name = request.form.get('organization_name')
+            # Gán organization_name cho full_name để lưu vào bảng User
+            full_name = organization_name 
+        else:
+            full_name = request.form.get('full_name')
 
         # Kiểm tra email đã tồn tại chưa
         if User.query.filter_by(email=email).first():
@@ -110,8 +125,8 @@ def register():
 
         # Nếu là Nhà tổ chức, lưu thêm vào bảng Organizer
         if role == 'ORGANIZER':
-            org_name = request.form.get('org_name')
-            new_org = Organizer(user_id=new_user.id, name=org_name)
+            # SỬA LỖI TẠI ĐÂY: Dùng chung biến organization_name
+            new_org = Organizer(user_id=new_user.id, name=organization_name)
             db.session.add(new_org)
 
         db.session.commit()
@@ -120,7 +135,7 @@ def register():
 
     return render_template('register.html')
 
-# XỬ LÝ ĐẶT VÉ
+# ======================== [XỬ LÝ ĐẶT VÉ] ========================
 @main_bp.route('/checkout/<int:event_id>', methods=['GET', 'POST'])
 def checkout(event_id):
     if 'user_id' not in session:
@@ -177,7 +192,7 @@ def checkout(event_id):
 
     return render_template('checkout.html', event=event, cart=cart_data)
 
-# XỬ LÝ THANH TOÁN VN PAY
+# ======================== [XỬ LÝ THANH TOÁN VN PAY] ========================
 @main_bp.route('/process_checkout/<int:event_id>', methods=['POST'])
 def process_checkout(event_id):
     if 'user_id' not in session:
@@ -253,7 +268,7 @@ def process_checkout(event_id):
     
     return redirect(vnpay_payment_url)
 
-# Trả kết quả VN Pay
+# ============================= [Trả kết quả VN Pay] =============================
 @main_bp.route('/vnpay_return')
 def vnpay_return():
     vnp = vnpay()
@@ -272,22 +287,27 @@ def vnpay_return():
         order = Order.query.filter_by(order_code=order_code).first()
         
         if order:
-            # 2. Mã 00 nghĩa là khách hàng đã thanh toán thành công
+            # Mã 00 nghĩa là khách hàng đã thanh toán thành công
             if vnp_ResponseCode == '00':
-                # Chỉ xử lý nếu đơn hàng đang ở trạng thái PENDING (tránh việc F5 trang bị sinh vé nhiều lần)
+                # Chỉ xử lý nếu đơn hàng đang ở trạng thái PENDING
                 if order.status == 'PENDING':
                     order.status = 'PAID'
                     
                     # Truy xuất các dòng chi tiết của đơn hàng này
                     order_items = OrderItem.query.filter_by(order_id=order.id).all()
                     
-                    # Phát hành vé tương ứng với số lượng từng loại
                     for item in order_items:
+                        # --- CỘNG DỒN SỐ VÉ ĐÃ BÁN ---
+                        ticket_type = TicketType.query.get(item.ticket_type_id)
+                        if ticket_type:
+                            ticket_type.quantity_sold += item.quantity
+
+                        # Phát hành vé tương ứng với số lượng từng loại
                         for _ in range(item.quantity):
                             # Tạo mã hiển thị trên vé (VD: TK-5-A1B2C3D4)
                             ticket_code = f"TK-{order.id}-{uuid.uuid4().hex[:8].upper()}"
                             
-                            # Tạo chuỗi bí mật để render ra mã QR (Dùng UUID nguyên bản)
+                            # Tạo chuỗi bí mật để render ra mã QR
                             qr_token = str(uuid.uuid4())
                             
                             new_ticket = Ticket(
@@ -298,7 +318,7 @@ def vnpay_return():
                             )
                             db.session.add(new_ticket)
                     
-                    # Lưu tất cả vé vào cơ sở dữ liệu
+                    # Lưu tất cả vào cơ sở dữ liệu
                     db.session.commit()
                     flash(f'Thanh toán thành công! Mã đơn hàng: {order_code}. Vé điện tử đã được phát hành.', 'success')
                 else:
@@ -311,7 +331,7 @@ def vnpay_return():
     # Đưa người dùng về trang chủ (hoặc trang Lịch sử mua vé sau này)
     return redirect(url_for('main.index'))
 
-# VÉ CỦA TÔI
+# ================================= [VÉ CỦA TÔI] =================================
 @main_bp.route('/my-tickets')
 def my_tickets():
     # Chặn người lạ
@@ -351,7 +371,7 @@ def my_tickets():
 
     return render_template('my_tickets.html', my_events=my_events)
 
-# CHECKIN
+# ================================= [CHECKIN] ======================================
 @main_bp.route('/event/<int:event_id>/checkin-scanner')
 def checkin_scanner(event_id):
     # Chỉ cho phép Organizer truy cập
@@ -452,10 +472,28 @@ def create_event():
         category_id = request.form.get('category')
         start_time_str = request.form.get('start_time')
         end_time_str = request.form.get('end_time')
+        sales_start_time_str = request.form.get('sales_start_time')
+        sales_end_time_str = request.form.get('sales_end_time')
+        checkin_method = request.form.get('checkin_method')
 
         # Chuyển đổi chuỗi thời gian HTML thành đối tượng datetime của Python
         start_time = datetime.strptime(start_time_str, '%Y-%m-%dT%H:%M')
         end_time = datetime.strptime(end_time_str, '%Y-%m-%dT%H:%M')
+        sales_start_time = datetime.strptime(sales_start_time_str, '%Y-%m-%dT%H:%M')
+        sales_end_time = datetime.strptime(sales_end_time_str, '%Y-%m-%dT%H:%M')
+
+        # --- LOGIC VALIDATE THỜI GIAN ---
+        if sales_start_time > start_time:
+            flash('Lỗi: Thời gian bắt đầu bán vé không được sau khi sự kiện bắt đầu!', 'error')
+            return redirect(url_for('main.create_event'))
+            
+        if sales_end_time > end_time:
+            flash('Lỗi: Thời gian kết thúc bán vé không được vượt quá thời gian kết thúc sự kiện!', 'error')
+            return redirect(url_for('main.create_event'))
+            
+        if sales_start_time >= sales_end_time:
+            flash('Lỗi: Thời gian bắt đầu bán phải trước thời gian kết thúc bán!', 'error')
+            return redirect(url_for('main.create_event'))
 
         # 2. Xử lý Upload Ảnh
         banner_file = request.files.get('banner')
@@ -489,7 +527,10 @@ def create_event():
             banner_url=banner_filename,
             organizer_id=current_user.id,
             category_id=category_id,
-            status='PUBLISHED'
+            status='PUBLISHED',
+            sales_start_time=sales_start_time,
+            sales_end_time=sales_end_time,
+            checkin_method=checkin_method
         )
         db.session.add(new_event)
         db.session.flush() # flush để lấy được new_event.id lập tức mà chưa cần commit
@@ -530,7 +571,7 @@ def create_event():
     categories = Category.query.all()
     return render_template('create_event.html', categories=categories)
 
-# ========== Xử lý tìm tất cả các sự kiện thuộc về Ban tổ chức đang đăng nhập ================
+# ========== [Xử lý tìm tất cả các sự kiện thuộc về Ban tổ chức đang đăng nhập] ================
 @main_bp.route('/organizer/events')
 def manage_events():
     # Kiểm tra quyền Organizer
@@ -546,4 +587,4 @@ def manage_events():
     # Lấy danh sách sự kiện do chính người này tạo, sắp xếp mới nhất lên đầu
     my_events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.id.desc()).all()
     
-    return render_template('manage_events.html', events=my_events)
+    return render_template('manage_events.html', events=my_events, now=datetime.now())

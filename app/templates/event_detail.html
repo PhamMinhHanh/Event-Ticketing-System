@@ -87,22 +87,43 @@
             {% endif %}
         </div>
         <div class="col-md-6 p-4 p-lg-5">
-            <div class="status-badge">Đang mở bán</div>
+            {% if event.status == 'CANCELLED' %}
+                <div class="status-badge bg-danger text-white border-0">Sự kiện đã hủy</div>
+            {% elif now < event.sales_start_time %}
+                <div class="status-badge bg-info text-white border-0">Sắp mở bán</div>
+            {% elif now > event.sales_end_time %}
+                <div class="status-badge bg-secondary text-white border-0">Đã kết thúc</div>
+            {% else %}
+                <div class="status-badge">Đang mở bán</div>
+            {% endif %}
             <h1 class="event-main-title">{{ event.title }}</h1>
             
             <div class="info-row">
-                <strong>⊞ Danh mục:</strong> {{ event.category.name if event.category else 'Khác' }}
+                <strong>Danh mục:</strong> {{ event.category.name if event.category else 'Khác' }}
             </div>
+
             <div class="info-row">
-                <strong>⏲︎ Thời gian:</strong> {{ event.start_time.strftime('%H:%M, %d/%m/%Y') }} - {{ event.end_time.strftime('%H:%M, %d/%m/%Y') }}
+                <strong>Tổ chức bởi:</strong> {{ organizer.full_name }}
             </div>
+
             <div class="info-row">
-                <strong>𖠿 Địa điểm:</strong> {{ event.location }}
+                <strong>Thời gian:</strong> {{ event.start_time.strftime('%H:%M, %d/%m/%Y') }} - {{ event.end_time.strftime('%H:%M, %d/%m/%Y') }}
             </div>
+
+
             <div class="info-row">
-                <strong>⎘ Check-in:</strong> QR / Face
+                <strong>Địa điểm:</strong> {{ event.location }}, {{ event.province }}
             </div>
-            
+
+            <div class="info-row">
+                <strong>Check-in:</strong> 
+                {% if event.checkin_method == 'FACE' %}
+                    <i class="bi bi-person-bounding-box"></i> Nhận diện Face ID
+                {% else %}
+                    <i class="bi bi-qr-code"></i> Quét mã QR
+                {% endif %}
+            </div>
+
             <div class="mt-4 text-end">
                 <span class="text-muted">Giá từ: </span>
                 <span class="price-highlight">{{ "{:,.0f}".format(event.base_price).replace(',', '.') }}đ</span>
@@ -143,16 +164,28 @@
                                 <span><strong>Tổng vé:</strong> {{ ticket.quantity_total }} | <strong>Đã bán:</strong> {{ ticket.quantity_sold }}</span>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-4 text-end mt-3 mt-md-0">
                             {% if available > 0 %}
                                 <small class="text-muted d-block mb-1">Còn lại: {{ available }} vé</small>
                                 <div class="d-flex justify-content-end align-items-center">
                                     <span class="me-2">Số lượng</span>
-                                    <input type="number" class="form-control form-control-sm ticket-qty" 
-                                        style="width: 70px;" min="0" max="{{ available }}" value="0"
-                                        name="ticket_{{ ticket.id }}" 
-                                        form="order-form"  data-name="{{ ticket.name }}" data-price="{{ ticket.price }}">
+                                    
+                                    <!-- LOGIC CHẶN CHỌN VÉ BÊN TRÁI -->
+                                    {% if session.get('user_role') == 'ORGANIZER' or session.get('role') == 'ORGANIZER' %}
+                                        <!-- Chặn nhà tổ chức -->
+                                        <input type="number" class="form-control form-control-sm" style="width: 70px;" value="0" disabled title="Ban tổ chức không thể mua vé">
+                                    {% elif now < event.sales_start_time or now > event.sales_end_time %}
+                                        <!-- Chặn sai thời gian -->
+                                        <input type="number" class="form-control form-control-sm" style="width: 70px;" value="0" disabled title="Chưa tới giờ bán hoặc đã kết thúc">
+                                    {% else %}
+                                        <!-- Hợp lệ thì cho phép nhập -->
+                                        <input type="number" class="form-control form-control-sm ticket-qty" 
+                                            style="width: 70px;" min="0" max="{{ available }}" value="0"
+                                            name="ticket_{{ ticket.id }}" 
+                                            form="order-form"  data-name="{{ ticket.name }}" data-price="{{ ticket.price }}">
+                                    {% endif %}
+                                    
                                 </div>
                             {% else %}
                                 <span class="badge-sold-out">Hết vé</span>
@@ -171,24 +204,53 @@
         </div>
 
         <div class="col-lg-4">
-            <form action="{{ url_for('main.checkout', event_id=event.id) }}" method="POST" id="order-form">
-                <div class="card-custom p-4 sidebar-sticky">
-                    <h3 class="section-title">Thông tin đặt vé</h3>
-                    
-                    <div id="order-items-container">
-                        <div class="text-muted small text-center my-3" id="empty-cart-msg">Chưa có vé nào được chọn.</div>
-                    </div>
-
-                    <div class="summary-total">
-                        <span>Tạm tính</span>
-                        <span class="price-highlight" id="total-price">0đ</span>
-                    </div>
-
-                    <button type="submit" class="btn-checkout">Tiếp tục đặt vé</button>
-                    <button type="button" class="btn-contact">Liên hệ ban tổ chức</button>
-                    <small class="text-muted d-block text-center mt-3" style="font-size: 0.8rem;">Vé điện tử sẽ được gửi sau khi đặt vé thành công.</small>
+            {% if event.status == 'CANCELLED' %}
+                <div class="alert alert-danger text-center">
+                    <i class="bi bi-x-octagon-fill"></i> Sự kiện này đã bị Ban tổ chức hủy bỏ.
                 </div>
-            </form>
+                    <!-- KIỂM TRA ROLE: Ban tổ chức thì không cho mua -->
+            {% elif session.get('user_role') == 'ORGANIZER' or session.get('role') == 'ORGANIZER' %}
+                <div class="alert alert-warning text-center">
+                    <i class="bi bi-exclamation-triangle"></i> Tài khoản Ban tổ chức không thể đặt vé trên hệ thống.
+                </div>
+
+            <!-- KIỂM TRA THỜI GIAN: Chưa tới giờ bán -->
+            {% elif now < event.sales_start_time %}
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-clock-history"></i> Sự kiện này sẽ mở bán vé vào lúc <strong>{{ event.sales_start_time.strftime('%H:%M - %d/%m/%Y') }}</strong>
+                </div>
+
+            <!-- KIỂM TRA THỜI GIAN: Đã qua giờ bán -->
+            {% elif now > event.sales_end_time %}
+                <div class="alert alert-danger text-center">
+                    <i class="bi bi-x-circle"></i> Rất tiếc! Sự kiện này đã kết thúc thời gian bán vé.
+                </div>
+
+            <!-- NẾU THỎA MÃN MỌI ĐIỀU KIỆN: Hiện Form mua vé -->
+            {% else %}
+
+                <form action="{{ url_for('main.checkout', event_id=event.id) }}" method="POST" id="order-form">
+                    <div class="card-custom p-4 sidebar-sticky">
+                        <h3 class="section-title">Thông tin đặt vé</h3>
+                        
+                        <div id="order-items-container">
+                            <div class="text-muted small text-center my-3" id="empty-cart-msg">Chưa có vé nào được chọn.</div>
+                        </div>
+
+                        <div class="summary-total">
+                            <span>Tạm tính</span>
+                            <span class="price-highlight" id="total-price">0đ</span>
+                        </div>
+
+                        <button type="submit" class="btn-checkout">Tiếp tục đặt vé</button>
+                        <!-- <button type="button" class="btn-contact">Liên hệ ban tổ chức</button> -->
+                        <a href="mailto:{{ organizer.email }}?subject=Liên hệ về sự kiện {{ event.title }}" class="btn btn-outline-primary btn-sm w-100 rounded-pill mt-2">
+                            <i class="bi bi-envelope"></i> Liên hệ Ban tổ chức
+                        </a>
+                        <small class="text-muted d-block text-center mt-3" style="font-size: 0.8rem;">Vé điện tử sẽ được gửi sau khi đặt vé thành công.</small>
+                    </div>
+                </form>
+            {% endif %}    
         </div>
     </div>
 </div>

@@ -36,23 +36,36 @@
                                     <div class="small"><i class="bi bi-calendar-event me-1"></i> {{ event.start_time.strftime('%d/%m/%Y %H:%M') }}</div>
                                 </td>
                                 <td>{{ event.province }}</td>
+                                
+                                <!-- TRẠNG THÁI SỰ KIỆN -->
                                 <td>
-                                    {% if event.status == 'PUBLISHED' %}
-                                        <span class="badge bg-success bg-opacity-10 text-success px-2 py-1 rounded-pill">Đang mở bán</span>
-                                    {% elif event.status == 'DRAFT' %}
-                                        <span class="badge bg-secondary bg-opacity-10 text-secondary px-2 py-1 rounded-pill">Bản nháp</span>
-                                    {% else %}
-                                        <span class="badge bg-danger bg-opacity-10 text-danger px-2 py-1 rounded-pill">Đã kết thúc</span>
+                                    {% if event.status == 'CANCELLED' %}
+                                        <span class="badge bg-danger text-white px-2 py-1 rounded-pill">Đã hủy</span>
+                                    {% elif event.sales_start_time and event.sales_end_time %}
+                                        <!-- Dùng namespace để xử lý so sánh ngày tháng nếu chưa truyền biến now -->
+                                        {% if event.sales_start_time.timestamp() > now.timestamp() %}
+                                            <span class="badge bg-info text-white px-2 py-1 rounded-pill">Sắp mở bán</span>
+                                        {% elif event.sales_end_time.timestamp() < now.timestamp() %}
+                                            <span class="badge bg-secondary text-white px-2 py-1 rounded-pill">Đã kết thúc</span>
+                                        {% else %}
+                                            <span class="badge bg-success text-white px-2 py-1 rounded-pill">Đang mở bán</span>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td class="text-end pe-4">
                                     <a href="{{ url_for('main.event_detail', event_id=event.id) }}" class="btn btn-sm btn-outline-secondary me-1" title="Xem chi tiết">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <!-- Nút liên kết thẳng đến trang Quét mã QR Check-in mà chúng ta đã làm -->
-                                    <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success" title="Quét mã QR Check-in">
-                                        <i class="bi bi-qr-code-scan"></i> Soát vé
-                                    </a>
+                                    
+                                    {% if event.status != 'CANCELLED' %}
+                                        <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã QR Check-in">
+                                            <i class="bi bi-qr-code-scan"></i> Soát vé
+                                        </a>
+                                        <!-- Gọi API hoặc Route để hủy -->
+                                        <button class="btn btn-sm btn-outline-danger" title="Hủy sự kiện" onclick="if(confirm('Bạn có chắc chắn muốn hủy sự kiện này? Hành động này không thể hoàn tác.')) window.location.href='/organizer/event/{{event.id}}/cancel';">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

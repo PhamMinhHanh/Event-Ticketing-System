@@ -45,7 +45,10 @@ with app.app_context():
         end_time=datetime.now() + timedelta(days=10, hours=3),
         banner_url='https://salt.tkbcdn.com/ts/ds/5d/bd/4c/7e7634e6feb267283819752d0bbb162e.png',
         base_price=140000,
-        organizer_id=org_profile.user_id
+        organizer_id=org_profile.user_id,
+        sales_start_time=datetime.now(), 
+        sales_end_time=Event.end_time, 
+        checkin_method='QR'
     )
 
     event2 = Event(
@@ -58,7 +61,10 @@ with app.app_context():
         end_time=datetime.now() + timedelta(days=5, hours=2),
         banner_url='https://salt.tkbcdn.com/ts/ds/d7/e7/f7/44b4ab809ab3e945f80730175c343f31.jpg',
         base_price=100000,
-        organizer_id=org_profile.user_id
+        organizer_id=org_profile.user_id,
+        sales_start_time=datetime.now(), 
+        sales_end_time=Event.end_time, 
+        checkin_method='QR'
     )
 
     event3 = Event(
@@ -71,7 +77,10 @@ with app.app_context():
         end_time=datetime.now() + timedelta(days=15, hours=1),
         banner_url='https://salt.tkbcdn.com/ts/ds/4f/4d/31/6da02c3b396bc1b68fc3e487a9cb1fab.png',
         base_price=150000,
-        organizer_id=org_profile.user_id
+        organizer_id=org_profile.user_id,
+        sales_start_time=datetime.now(), 
+        sales_end_time=Event.end_time, 
+        checkin_method='QR'
     )
 
     event4 = Event(
@@ -83,7 +92,10 @@ with app.app_context():
         end_time=datetime.now() + timedelta(days=7, hours=2),
         banner_url='https://salt.tkbcdn.com/ts/ds/db/d9/6b/7ef0f96eb6bc673df8fd0a7163f1a640.jpg',
         base_price=300000,
-        organizer_id=org_profile.user_id
+        organizer_id=org_profile.user_id,
+        sales_start_time=datetime.now(), 
+        sales_end_time=Event.end_time, 
+        checkin_method='QR'
     )
 
     db.session.add_all([event1, event2, event3, event4])
