@@ -24,9 +24,12 @@ class Event(db.Model):
     end_time = db.Column(db.DateTime, nullable=False)
     banner_url = db.Column(db.String(255), nullable=True)
     base_price = db.Column(db.Numeric(12, 2), default=0)
-    status = db.Column(db.Enum('DRAFT', 'PUBLISHED', 'CLOSED', 'CANCELLED'), default='DRAFT')
+    status = db.Column(db.Enum('PUBLISHED', 'CLOSED', 'CANCELLED'), default='')
     checkin_mode = db.Column(db.Enum('QR', 'FACE', 'BOTH'), default='QR')
     ticket_types = db.relationship('TicketType', backref='event', lazy=True)
+    sales_start_time = db.Column(db.DateTime, nullable=True) # Ngày bắt đầu bán
+    sales_end_time = db.Column(db.DateTime, nullable=True)   # Ngày kết thúc bán
+    checkin_method = db.Column(db.Enum('QR', 'FACE'), default='QR', nullable=False) # Loại check-in
 
 # BẢNG LOẠI VÉ
 class TicketType(db.Model):
@@ -102,3 +105,15 @@ class Organizer(db.Model):
     name = db.Column(db.String(200), nullable=False) # Tên đơn vị tổ chức
     bio = db.Column(db.Text, nullable=True)
     verified = db.Column(db.Boolean, default=False)
+
+# BẢNG CHECKIN
+class Checkin(db.Model):
+    __tablename__ = 'checkins'
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    ticket_id = db.Column(db.BigInteger, db.ForeignKey('tickets.id'), nullable=False)
+    checked_in_by = db.Column(db.BigInteger, db.ForeignKey('users.id'), nullable=False)
+    checkin_method = db.Column(db.Enum('QR', 'FACE', 'MANUAL'), nullable=False)
+    matched_score = db.Column(db.Numeric(5, 4), nullable=True) # Dành cho FaceID sau này
+    result = db.Column(db.Enum('SUCCESS', 'FAILED'), nullable=False)
+    checkin_time = db.Column(db.DateTime, default=datetime.utcnow)
+    note = db.Column(db.String(255), nullable=True)

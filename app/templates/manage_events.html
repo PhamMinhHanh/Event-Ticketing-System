@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Quản lý sự kiện - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Quản lý sự kiện của tôi</h2>
+        <a href="{{ url_for('main.create_event') }}" class="btn btn-primary rounded-pill px-4 fw-bold">
+            <i class="bi bi-plus-lg"></i> Tạo sự kiện mới
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" class="ps-4">Tên sự kiện</th>
+                            <th scope="col">Thời gian</th>
+                            <th scope="col">Khu vực</th>
+                            <th scope="col">Trạng thái</th>
+                            <th scope="col" class="text-end pe-4">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if events %}
+                            {% for event in events %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">{{ event.title }}</div>
+                                    <div class="small text-muted">{{ event.category.name if event.category else 'Khác' }}</div>
+                                </td>
+                                <td>
+                                    <div class="small"><i class="bi bi-calendar-event me-1"></i> {{ event.start_time.strftime('%d/%m/%Y %H:%M') }}</div>
+                                </td>
+                                <td>{{ event.province }}</td>
+                                
+                                <!-- TRẠNG THÁI SỰ KIỆN -->
+                                <td>
+                                    {% if event.status == 'CANCELLED' %}
+                                        <span class="badge bg-danger text-white px-2 py-1 rounded-pill">Đã hủy</span>
+                                    {% elif event.sales_start_time and event.sales_end_time %}
+                                        <!-- Dùng namespace để xử lý so sánh ngày tháng nếu chưa truyền biến now -->
+                                        {% if event.sales_start_time.timestamp() > now.timestamp() %}
+                                            <span class="badge bg-info text-white px-2 py-1 rounded-pill">Sắp mở bán</span>
+                                        {% elif event.sales_end_time.timestamp() < now.timestamp() %}
+                                            <span class="badge bg-secondary text-white px-2 py-1 rounded-pill">Đã kết thúc</span>
+                                        {% else %}
+                                            <span class="badge bg-success text-white px-2 py-1 rounded-pill">Đang mở bán</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{{ url_for('main.event_detail', event_id=event.id) }}" class="btn btn-sm btn-outline-secondary me-1" title="Xem chi tiết">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    
+                                    {% if event.status != 'CANCELLED' %}
+                                        <a href="{{ url_for('main.edit_event', event_id=event.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Chỉnh sửa">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+
+                                        <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã Check-in">
+                                            <i class="bi bi-qr-code-scan"></i> Soát vé
+                                        </a>
+                                        <!-- Gọi API hoặc Route để hủy -->
+                                        <button class="btn btn-sm btn-outline-danger" title="Hủy sự kiện" onclick="if(confirm('Bạn có chắc chắn muốn hủy sự kiện này? Hành động này không thể hoàn tác.')) window.location.href='/organizer/event/{{event.id}}/cancel';">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                                    Bạn chưa tạo sự kiện nào.<br>
+                                    Hãy tạo sự kiện đầu tiên ngay hôm nay!
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

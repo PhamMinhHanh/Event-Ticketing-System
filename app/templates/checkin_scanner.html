@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}Quét vé - {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5 text-center">
+    <h2 class="fw-bold mb-2">Hệ thống Soát vé</h2>
+    <p class="text-muted mb-4">{{ event.title }}</p>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow border-0 rounded-4 overflow-hidden">
+                <div class="card-body p-0">
+                    <!-- Khu vực hiển thị Camera -->
+                    <div id="reader" width="100%"></div>
+                </div>
+            </div>
+            
+            <!-- Khu vực hiển thị thông báo kết quả quét -->
+            <div id="result-message" class="alert mt-4" style="display: none; font-size: 1.1rem; font-weight: 500;">
+            </div>
+            
+            <a href="{{ url_for('main.event_detail', event_id=event.id) }}" class="btn btn-outline-secondary mt-3 rounded-pill px-4">
+                <i class="bi bi-arrow-left"></i> Quay lại sự kiện
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Nhúng thư viện quét QR -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<script>
+    // Lấy ID sự kiện từ Flask truyền xuống
+    const eventId = parseInt("{{ event.id }}");
+    const resultDiv = document.getElementById('result-message');
+    let isProcessing = false; // Cờ chống spam API
+
+    function onScanSuccess(decodedText, decodedResult) {
+        // Nếu đang xử lý một vé trước đó thì bỏ qua để không gọi API liên tục
+        if (isProcessing) return;
+        isProcessing = true;
+
+        // Báo hiệu đang xử lý
+        resultDiv.className = 'alert alert-info mt-4';
+        resultDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xử lý mã...';
+        resultDiv.style.display = 'block';
+
+        // Gửi mã QR token lên API Backend bằng Fetch (AJAX)
+        fetch('/api/checkin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                qr_token: decodedText,
+                event_id: eventId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Quét thành công (Màu xanh)
+                resultDiv.className = 'alert alert-success mt-4';
+                resultDiv.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${data.message} <br> <small class="fw-bold">${data.ticket_type} - ${data.ticket_code}</small>`;
+                
+                // Tiếng bíp thành công (tùy chọn)
+                let audio = new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3');
+                audio.play().catch(e => console.log('Trình duyệt chặn autoplay âm thanh'));
+            } else {
+                // Quét thất bại hoặc vé đã dùng (Màu đỏ)
+                resultDiv.className = 'alert alert-danger mt-4';
+                resultDiv.innerHTML = `<i class="bi bi-x-octagon-fill"></i> ${data.message}`;
+            }
+            
+            // Đợi 2.5 giây sau đó mở khóa để quét vé tiếp theo
+            setTimeout(() => {
+                isProcessing = false;
+                resultDiv.style.display = 'none';
+            }, 2500);
+        })
+        .catch(error => {
+            console.error('Lỗi:', error);
+            resultDiv.className = 'alert alert-danger mt-4';
+            resultDiv.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> Lỗi kết nối đến máy chủ!';
+            isProcessing = false;
+        });
+    }
+
+    function onScanFailure(error) {
+        // Hàm này chạy liên tục khi camera chưa tìm thấy QR, ta có thể bỏ qua không in lỗi để tránh đầy console
+    }
+
+    // Khởi tạo máy quét HTML5-QRCode
+    let html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader",
+        { fps: 10, qrbox: {width: 250, height: 250} },
+        /* verbose= */ false
+    );
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+</script>
+{% endblock %}
