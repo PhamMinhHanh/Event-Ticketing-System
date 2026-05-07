@@ -8,6 +8,9 @@ import uuid
 import os
 from werkzeug.utils import secure_filename
 import json
+#để dùng hàm AVG
+from sqlalchemy import func
+
 
 # Khởi tạo Blueprint thay vì gọi trực tiếp biến 'app'
 main_bp = Blueprint('main', __name__)
@@ -22,37 +25,55 @@ def inject_global_vars():
     return dict(categories=categories, provinces=provinces)
 
 # ===================== [Tìm và lọc tìm kiếm] ========================
+from app.models import Event, Category, TicketType # Đảm bảo đã import TicketType
+
 @main_bp.route('/')
 def index():
-    keyword = request.args.get('q', '')
+    keyword = request.args.get('keyword')
     category_id = request.args.get('category')
     province = request.args.get('province')
+    price_range = request.args.get('price')
 
-    query = Event.query
+    # Khởi tạo câu truy vấn mặc định: Lấy các sự kiện đang PUBLISHED
+    query = Event.query.filter_by(status='PUBLISHED')
 
-    # Tìm trong tiêu đề HOẶC mô tả
+    # Lọc theo từ khóa
     if keyword:
-        # không phân biệt chữ hoa/chữ thường
-        query = query.filter(db.or_(
-            Event.title.ilike(f'%{keyword}%'),
-            Event.description.ilike(f'%{keyword}%')
-        ))
-
+        query = query.filter(Event.title.ilike(f'%{keyword}%'))
+        
     # Lọc theo danh mục
-    if category_id and category_id.isdigit():
-        query = query.filter(Event.category_id == int(category_id))
-
-    # Lọc theo địa điểm (Tỉnh/Thành phố)
-    if province and province != 'all':
+    if category_id:
+        query = query.filter(Event.category_id == category_id)
+        
+    # Lọc theo khu vực
+    if province:
         query = query.filter(Event.province == province)
 
+    # LỌC THEO MỨC GIÁ
+    if price_range:
+        # Join bảng TicketType để kiểm tra giá vé
+        query = query.join(TicketType)
+        
+        if price_range == 'free':
+            query = query.filter(TicketType.price == 0)
+        elif price_range == 'under_500':
+            query = query.filter(TicketType.price > 0, TicketType.price < 500000)
+        elif price_range == '500_to_1000':
+            query = query.filter(TicketType.price >= 500000, TicketType.price <= 1000000)
+        elif price_range == 'over_1000':
+            query = query.filter(TicketType.price > 1000000)
+            
+        # Tránh việc 1 sự kiện hiển thị nhiều lần (nếu có 2 loại vé cùng thỏa mãn điều kiện)
+        query = query.distinct()
+
+    # Thực thi truy vấn lấy kết quả
     events = query.all()
     categories = Category.query.all()
     
-    provinces_data = db.session.query(Event.province).distinct().all()
-    provinces = [p[0] for p in provinces_data if p[0]]
+    from datetime import datetime
+    now = datetime.now()
 
-    return render_template('index.html', events=events, categories=categories, provinces=provinces)
+    return render_template('index.html', events=events, categories=categories, now=now)
 
 # ======================== [CHI TIẾT SỰ KIỆN] ========================
 @main_bp.route('/event/<int:event_id>')
@@ -711,3 +732,45 @@ def organizer_dashboard():
                            total_revenue=total_revenue,
                            chart_labels=json.dumps(chart_labels), # Dùng json.dumps để JS đọc được an toàn
                            chart_data=json.dumps(chart_data))
+
+# ============================== [ ĐỀ XUẤT GIÁ VÉ KHI KHỞI TẠO ] ==============================
+@main_bp.route('/api/suggest-price')
+def suggest_price():
+    category_id = request.args.get('category_id')
+    province = request.args.get('province')
+
+    if not category_id or not province:
+        return jsonify({'suggested_price': 0})
+
+    # Truy vấn tính giá trung bình của các loại vé 
+    # thuộc các sự kiện cùng Category và Province
+    avg_price = db.session.query(func.avg(TicketType.price))\
+        .join(Event)\
+        .filter(Event.category_id == category_id)\
+        .filter(Event.province == province)\
+        .filter(Event.status == 'PUBLISHED')\
+        .scalar()
+
+    # Nếu chưa có dữ liệu tương tự, trả về 0
+    suggested_value = int(avg_price) if avg_price else 0
+    
+    return jsonify({'suggested_price': suggested_value})
+
+# =========================== [ ĐỀ XUẤT GIẢM GIÁ VÉ KHI CẬN HẠN] ==============================
+@main_bp.route('/organizer/ticket/<int:ticket_id>/discount', methods=['POST'])
+def apply_ticket_discount(ticket_id):
+    # Kiểm tra quyền
+    if 'user_id' not in session or (session.get('role') != 'ORGANIZER' and session.get('user_role') != 'ORGANIZER'):
+        return redirect(url_for('main.login'))
+        
+    ticket = TicketType.query.get_or_404(ticket_id)
+    discount_percent = request.form.get('discount_percent', type=int)
+    
+    if discount_percent:
+        # Tính toán giá mới (Làm tròn số)
+        new_price = int(ticket.price * (100 - discount_percent) / 100)
+        ticket.price = new_price
+        db.session.commit()
+        flash(f'Đã áp dụng giảm {discount_percent}% cho vé "{ticket.name}". Giá mới: {new_price}đ', 'success')
+        
+    return redirect(request.referrer) # Quay lại trang hiện tại

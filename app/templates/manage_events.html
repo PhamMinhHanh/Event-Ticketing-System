@@ -37,12 +37,10 @@
                                 </td>
                                 <td>{{ event.province }}</td>
                                 
-                                <!-- TRẠNG THÁI SỰ KIỆN -->
                                 <td>
                                     {% if event.status == 'CANCELLED' %}
                                         <span class="badge bg-danger text-white px-2 py-1 rounded-pill">Đã hủy</span>
                                     {% elif event.sales_start_time and event.sales_end_time %}
-                                        <!-- Dùng namespace để xử lý so sánh ngày tháng nếu chưa truyền biến now -->
                                         {% if event.sales_start_time.timestamp() > now.timestamp() %}
                                             <span class="badge bg-info text-white px-2 py-1 rounded-pill">Sắp mở bán</span>
                                         {% elif event.sales_end_time.timestamp() < now.timestamp() %}
@@ -52,6 +50,7 @@
                                         {% endif %}
                                     {% endif %}
                                 </td>
+                                
                                 <td class="text-end pe-4">
                                     <a href="{{ url_for('main.event_detail', event_id=event.id) }}" class="btn btn-sm btn-outline-secondary me-1" title="Xem chi tiết">
                                         <i class="bi bi-eye"></i>
@@ -65,7 +64,9 @@
                                         <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã Check-in">
                                             <i class="bi bi-qr-code-scan"></i> Soát vé
                                         </a>
-                                        <!-- Gọi API hoặc Route để hủy -->
+                                        <button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#ticketModal{{ event.id }}" title="Quản lý Giá vé & Khuyến mãi">
+                                            <i class="bi bi-tags"></i>
+                                        </button>
                                         <button class="btn btn-sm btn-outline-danger" title="Hủy sự kiện" onclick="if(confirm('Bạn có chắc chắn muốn hủy sự kiện này? Hành động này không thể hoàn tác.')) window.location.href='/organizer/event/{{event.id}}/cancel';">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -87,5 +88,74 @@
             </div>
         </div>
     </div>
+
+    {% if events %}
+        {% for event in events %}
+        <div class="modal fade" id="ticketModal{{ event.id }}" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title fw-bold">Quản lý vé: {{ event.title }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        
+                        {% set days_left = (event.start_time.date() - now.date()).days %}
+                        {% set discount_rate = 0 %}
+                        
+                        {% if 0 <= days_left <= 2 %} {% set discount_rate = 50 %}
+                        {% elif 3 <= days_left <= 5 %} {% set discount_rate = 30 %}
+                        {% elif 6 <= days_left <= 7 %} {% set discount_rate = 10 %}
+                        {% endif %}
+
+                        {% if discount_rate > 0 and event.status == 'PUBLISHED' %}
+                        <div class="alert alert-warning mb-4">
+                            <i class="bi bi-fire text-danger fs-5 me-2"></i>
+                            <strong>Gợi ý từ hệ thống:</strong> Chỉ còn <strong>{{ days_left }} ngày</strong> là sự kiện diễn ra. Bạn có muốn kích cầu doanh số bằng cách giảm <strong>{{ discount_rate }}%</strong> giá vé không?
+                        </div>
+                        {% endif %}
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Tên loại vé</th>
+                                        <th>Đã bán</th>
+                                        <th>Giá hiện tại</th>
+                                        <th>Khuyến mãi giờ chót</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ticket in event.ticket_types %}
+                                    <tr>
+                                        <td class="fw-medium">{{ ticket.name }}</td>
+                                        <td>{{ ticket.quantity_sold }} / {{ ticket.quantity_total }}</td>
+                                        <td class="text-primary fw-bold">{{ "{:,.0f}".format(ticket.price).replace(',', '.') }} đ</td>
+                                        <td>
+                                            {% if discount_rate > 0 and ticket.price > 0 and ticket.quantity_sold < ticket.quantity_total %}
+                                                <form action="{{ url_for('main.apply_ticket_discount', ticket_id=ticket.id) }}" method="POST" class="d-inline">
+                                                    <input type="hidden" name="discount_percent" value="{{ discount_rate }}">
+                                                    {% set new_price = ticket.price * (100 - discount_rate) / 100 %}
+                                                    <button type="submit" class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="return confirm('Xác nhận giảm giá vé này?');">
+                                                        <i class="bi bi-arrow-down-circle"></i> Đồng ý giảm {{ discount_rate }}% 
+                                                        <br><small>(Còn {{ "{:,.0f}".format(new_price).replace(',', '.') }} đ)</small>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <span class="text-muted small">Không có gợi ý</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+
 </div>
 {% endblock %}
