@@ -61,9 +61,20 @@
                                             <i class="bi bi-pencil-square"></i>
                                         </a>
 
-                                        <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã Check-in">
+                                        {% if event.checkin_method == 'FACE' %}
+                                            <a href="{{ url_for('main.face_checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-info me-1" title="Quét FaceID">
+                                                <i class="bi bi-person-bounding-box"></i> Soát vé (FaceID)
+                                            </a>
+                                        {% else %}
+                                            <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã QR">
+                                                <i class="bi bi-qr-code-scan"></i> Soát vé (QR)
+                                            </a>
+                                        {% endif %}
+
+                                        <!-- <a href="{{ url_for('main.checkin_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-success me-1" title="Quét mã Check-in">
                                             <i class="bi bi-qr-code-scan"></i> Soát vé
-                                        </a>
+                                        </a> -->
+                                        
                                         <button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#ticketModal{{ event.id }}" title="Quản lý Giá vé & Khuyến mãi">
                                             <i class="bi bi-tags"></i>
                                         </button>

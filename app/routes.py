@@ -83,7 +83,33 @@ def event_detail(event_id):
     organizer = User.query.get(event.organizer_id) # Lấy data Ban tổ chức
     ticket_types = TicketType.query.filter_by(event_id=event.id).all()
 
-    return render_template('event_detail.html', event=event, ticket_types=ticket_types, organizer=organizer, now=datetime.now())
+    now = datetime.now()
+
+    sold_tickets_info = []
+    # Nếu đang đăng nhập và là Organizer của sự kiện này
+    if 'user_id' in session and event.organizer_id == session['user_id']:
+        # Join bảng để lấy: Mã vé, Tên vé, Trạng thái, Giá, Tên người mua
+        tickets_query = db.session.query(Ticket, TicketType, Order, User)\
+            .join(OrderItem, Ticket.order_item_id == OrderItem.id)\
+            .join(TicketType, OrderItem.ticket_type_id == TicketType.id)\
+            .join(Order, OrderItem.order_id == Order.id)\
+            .join(User, Order.user_id == User.id)\
+            .filter(Order.event_id == event.id)\
+            .order_by(Order.created_at.desc())\
+            .all()
+            
+        for t, tt, o, u in tickets_query:
+            sold_tickets_info.append({
+                'ticket_code': t.ticket_code,
+                'buyer_name': u.full_name,
+                'buyer_email': u.email,
+                'ticket_type': tt.name,
+                'price': tt.price,
+                'status': t.status,
+                'issued_at': t.issued_at.strftime('%d/%m/%Y %H:%M')
+            })
+
+    return render_template('event_detail.html', event=event, organizer=organizer, now=now, sold_tickets_info=sold_tickets_info)
 
 # ======================== [LOGIN] ========================
 @main_bp.route('/login', methods=['GET', 'POST'])
@@ -225,6 +251,11 @@ def process_checkout(event_id):
         flash('Giỏ hàng không hợp lệ.', 'error')
         return redirect(url_for('main.event_detail', event_id=event_id))
 
+    # --- LẤY VECTOR KHUÔN MẶT ---
+    face_vector = request.form.get('face_vector')
+    if face_vector:
+        session['temp_face_vector'] = face_vector # Lưu tạm vào session chờ VNPAY
+
     # 1. Tạo mã đơn hàng duy nhất (Ví dụ: EVB-20260429153012)
     order_code = f"EVB-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     total_amount = cart_data['total_amount']
@@ -314,6 +345,9 @@ def vnpay_return():
                 # Chỉ xử lý nếu đơn hàng đang ở trạng thái PENDING
                 if order.status == 'PENDING':
                     order.status = 'PAID'
+
+                    # --- LẤY VECTOR KHUÔN MẶT TỪ SESSION RA ---
+                    face_vector = session.pop('temp_face_vector', None)
                     
                     # Truy xuất các dòng chi tiết của đơn hàng này
                     order_items = OrderItem.query.filter_by(order_id=order.id).all()
@@ -336,6 +370,7 @@ def vnpay_return():
                                 ticket_code=ticket_code,
                                 order_item_id=item.id,
                                 qr_token=qr_token,
+                                face_vector=face_vector,
                                 status='ISSUED'
                             )
                             db.session.add(new_ticket)
@@ -774,3 +809,105 @@ def apply_ticket_discount(ticket_id):
         flash(f'Đã áp dụng giảm {discount_percent}% cho vé "{ticket.name}". Giá mới: {new_price}đ', 'success')
         
     return redirect(request.referrer) # Quay lại trang hiện tại
+
+# ======================================================
+# =================[ CHECKIN FACEID] ===================
+# ======================================================
+# 1. Route hiển thị màn hình Camera quét mặt
+@main_bp.route('/event/<int:event_id>/face-checkin')
+def face_checkin_scanner(event_id):
+    if 'user_id' not in session or (session.get('role') != 'ORGANIZER' and session.get('user_role') != 'ORGANIZER'):
+        flash('Bạn không có quyền truy cập!', 'error')
+        return redirect(url_for('main.login'))
+    
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != session['user_id']:
+        flash('Bạn không phải ban tổ chức của sự kiện này!', 'error')
+        return redirect(url_for('main.index'))
+        
+    return render_template('face_checkin.html', event=event)
+
+# 2. API "nhả" danh sách vector khuôn mặt của các khách đã mua vé
+@main_bp.route('/api/event/<int:event_id>/face-data')
+def get_face_data(event_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False}), 403
+
+    # Chỉ lấy các vé có trạng thái ISSUED và đã đăng ký face_vector
+    tickets = db.session.query(Ticket, OrderItem, TicketType)\
+        .join(OrderItem, Ticket.order_item_id == OrderItem.id)\
+        .join(TicketType, OrderItem.ticket_type_id == TicketType.id)\
+        .join(Order, OrderItem.order_id == Order.id)\
+        .filter(Order.event_id == event_id)\
+        .filter(Ticket.status == 'ISSUED')\
+        .filter(Ticket.face_vector.isnot(None))\
+        .all()
+
+    face_data = []
+    for t, oi, tt in tickets:
+        try:
+            # Chuyển chuỗi JSON (Text) thành mảng số thực để gửi cho JS
+            vector_list = json.loads(t.face_vector)
+            face_data.append({
+                'ticket_code': t.ticket_code,
+                'ticket_name': tt.name,
+                'vector': vector_list
+            })
+        except Exception:
+            continue
+
+    return jsonify({'success': True, 'data': face_data})
+
+# 3. API đánh dấu Check-in thành công khi AI phát hiện trùng khớp
+@main_bp.route('/api/face-checkin', methods=['POST'])
+def api_face_checkin():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Không có quyền!'}), 403
+
+    data = request.get_json()
+    ticket_code = data.get('ticket_code')
+    matched_score = data.get('matched_score', 0) 
+    event_id = data.get('event_id')
+
+    ticket = Ticket.query.filter_by(ticket_code=ticket_code).first()
+    if not ticket:
+        return jsonify({'success': False, 'message': 'Không tìm thấy vé hợp lệ!'})
+        
+    # Kiểm tra trạng thái vé
+    if ticket.status == 'CHECKED_IN':
+        # Logic: Nếu vé này đã dùng, tìm vé khác CÙNG SỰ KIỆN + CÙNG KHUÔN MẶT còn trống
+        other_ticket = db.session.query(Ticket)\
+            .join(OrderItem).join(Order)\
+            .filter(Order.event_id == event_id)\
+            .filter(Ticket.face_vector == ticket.face_vector)\
+            .filter(Ticket.status == 'ISSUED')\
+            .first()
+
+        if other_ticket:
+            ticket = other_ticket 
+        else:
+            return jsonify({'success': False, 'message': 'CẢNH BÁO: Tất cả vé của khuôn mặt này đã được sử dụng!'})
+    
+    # Kiểm tra bảo mật: Vé phải thuộc đúng sự kiện đang quét
+    order_item = OrderItem.query.get(ticket.order_item_id)
+    order = Order.query.get(order_item.order_id)
+    if order.event_id != int(event_id):
+        return jsonify({'success': False, 'message': 'Vé không thuộc sự kiện này!'})
+
+    # Cập nhật trạng thái và lưu lịch sử
+    ticket.status = 'CHECKED_IN'
+    new_checkin = Checkin(
+        ticket_id=ticket.id,
+        checked_in_by=session['user_id'],
+        checkin_method='FACE',
+        matched_score=matched_score,
+        result='SUCCESS'
+    )
+    db.session.add(new_checkin)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Nhận diện thành công! Mời vào.',
+        'ticket_code': ticket.ticket_code
+    })

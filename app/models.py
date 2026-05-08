@@ -2,14 +2,18 @@ from app import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Bảng Danh mục sự kiện
+# ==========================================
+# BẢNG: DANH MỤC SỰ KIỆN
+# ==========================================
 class Category(db.Model):
     __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=True)
 
-# Bảng Sự kiện
+# ==========================================
+# BẢNG: SỰ KIỆN
+# ==========================================
 class Event(db.Model):
     __tablename__ = 'events'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -31,7 +35,9 @@ class Event(db.Model):
     sales_end_time = db.Column(db.DateTime, nullable=True)   # Ngày kết thúc bán
     checkin_method = db.Column(db.Enum('QR', 'FACE'), default='QR', nullable=False) # Loại check-in
 
-# BẢNG LOẠI VÉ
+# ==========================================
+# BẢNG: LOẠI VÉ
+# ==========================================
 class TicketType(db.Model):
     __tablename__ = 'ticket_types'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -45,7 +51,9 @@ class TicketType(db.Model):
     refund_policy_days = db.Column(db.Integer, default=0)
     status = db.Column(db.Enum('ACTIVE', 'INACTIVE'), default='ACTIVE')
 
-# BẢNG ĐẶT VÉ
+# ==========================================
+# BẢNG: ĐẶT VÉ
+# ==========================================
 class Order(db.Model):
     __tablename__ = 'orders'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -68,7 +76,9 @@ class OrderItem(db.Model):
     unit_price = db.Column(db.Numeric(12, 2), nullable=False)
     line_total = db.Column(db.Numeric(12, 2), nullable=False)
 
-# BẢNG VÉ
+# ==========================================
+# BẢNG: VÉ VẬT LÝ/ĐIỆN TỬ
+# ==========================================
 class Ticket(db.Model):
     __tablename__ = 'tickets'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -76,10 +86,33 @@ class Ticket(db.Model):
     order_item_id = db.Column(db.BigInteger, db.ForeignKey('order_items.id'), nullable=False)
     
     qr_token = db.Column(db.String(255), unique=True, nullable=False)
+    
+    # Cột lưu chuỗi Vector 128 số thập phân của khuôn mặt
+    face_vector = db.Column(db.Text, nullable=True) 
+    
     status = db.Column(db.Enum('ISSUED', 'CHECKED_IN', 'CANCELLED', 'REFUNDED'), default='ISSUED')
     issued_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# Bảng Người dùng chung
+# ==========================================
+# BẢNG: YÊU CẦU HOÀN TIỀN (REFUND REQUEST)
+# ==========================================
+class RefundRequest(db.Model):
+    __tablename__ = 'refund_requests'
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    order_id = db.Column(db.BigInteger, db.ForeignKey('orders.id'), nullable=False)
+    user_id = db.Column(db.BigInteger, db.ForeignKey('users.id'), nullable=False)
+    reason = db.Column(db.String(255), nullable=False) # Lý do khách muốn hoàn tiền
+    status = db.Column(db.Enum('PENDING', 'APPROVED', 'REJECTED'), default='PENDING')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Thiết lập relationship để dễ dàng truy vấn ngược lại đơn hàng
+    order = db.relationship('Order', backref=db.backref('refund_requests', lazy=True))
+    user = db.relationship('User', backref=db.backref('refund_requests', lazy=True))
+
+# ==========================================
+# BẢNG: NGƯỜI DÙNG CHUNG
+# ==========================================
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -91,29 +124,32 @@ class User(db.Model):
     status = db.Column(db.Enum('ACTIVE', 'INACTIVE', 'BANNED'), default='ACTIVE')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Hàm hỗ trợ mã hóa mật khẩu
     def set_password(self, password):
         self.password = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password, password)
 
-# Bảng chi tiết Nhà tổ chức
+# ==========================================
+# BẢNG: CHI TIẾT NTC
+# ==========================================
 class Organizer(db.Model):
     __tablename__ = 'organizers'
     user_id = db.Column(db.BigInteger, db.ForeignKey('users.id'), primary_key=True)
-    name = db.Column(db.String(200), nullable=False) # Tên đơn vị tổ chức
+    name = db.Column(db.String(200), nullable=False) 
     bio = db.Column(db.Text, nullable=True)
     verified = db.Column(db.Boolean, default=False)
 
-# BẢNG CHECKIN
+# ==========================================
+# BẢNG: CHECKIN
+# ==========================================
 class Checkin(db.Model):
     __tablename__ = 'checkins'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     ticket_id = db.Column(db.BigInteger, db.ForeignKey('tickets.id'), nullable=False)
     checked_in_by = db.Column(db.BigInteger, db.ForeignKey('users.id'), nullable=False)
     checkin_method = db.Column(db.Enum('QR', 'FACE', 'MANUAL'), nullable=False)
-    matched_score = db.Column(db.Numeric(5, 4), nullable=True) # Dành cho FaceID sau này
+    matched_score = db.Column(db.Numeric(5, 4), nullable=True) # Dành cho FaceID lưu lại độ chính xác %
     result = db.Column(db.Enum('SUCCESS', 'FAILED'), nullable=False)
     checkin_time = db.Column(db.DateTime, default=datetime.utcnow)
     note = db.Column(db.String(255), nullable=True)

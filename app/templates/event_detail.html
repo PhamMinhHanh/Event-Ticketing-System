@@ -254,6 +254,58 @@
         </div>
     </div>
 </div>
+
+{% if session.get('user_id') == event.organizer_id %}
+    <div class="card-custom mt-5 p-4 border-primary border-2">
+        <h3 class="section-title text-primary"><i class="bi bi-people-fill"></i> Danh sách vé đã bán</h3>
+        <p class="text-muted small">Chỉ Ban tổ chức mới có thể nhìn thấy danh sách này.</p>
+        
+        <div class="table-responsive mt-3">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>STT</th>
+                        <th>Mã vé</th>
+                        <th>Người mua</th>
+                        <th>Loại vé</th>
+                        <th>Trạng thái</th>
+                        <th>Ngày xuất vé</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in sold_tickets_info %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="fw-bold text-secondary">{{ t.ticket_code }}</td>
+                        <td>
+                            <strong>{{ t.buyer_name }}</strong><br>
+                            <small class="text-muted">{{ t.buyer_email }}</small>
+                        </td>
+                        <td>{{ t.ticket_type }}<br><small class="text-primary">{{ "{:,.0f}".format(t.price).replace(',', '.') }}đ</small></td>
+                        <td>
+                            {% if t.status == 'CHECKED_IN' %}
+                                <span class="badge bg-success">Đã Check-in</span>
+                            {% elif t.status == 'ISSUED' %}
+                                <span class="badge bg-warning text-dark">Chưa sử dụng</span>
+                            {% elif t.status == 'REFUNDED' %}
+                                <span class="badge bg-secondary">Đã hoàn tiền</span>
+                            {% else %}
+                                <span class="badge bg-danger">Đã hủy</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ t.issued_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">Chưa có vé nào được bán ra.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
 {% endblock %}
 
 {% block scripts %}

@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}FaceID Check-in - {{ event.title }}{% endblock %}
+
+{% block styles %}
+<style>
+    .camera-container {
+        position: relative;
+        width: 100%;
+        max-width: 720px;
+        margin: 0 auto;
+        border-radius: 1rem;
+        overflow: hidden;
+        background-color: #000;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    #video {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    /* Khung Canvas để vẽ khung xanh/đỏ đè lên mặt */
+    canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+    .overlay-ui {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: bold;
+        z-index: 10;
+        text-align: center;
+        min-width: 250px;
+    }
+    .result-modal {
+        display: none;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 30px;
+        border-radius: 1rem;
+        text-align: center;
+        z-index: 20;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5 text-center">
+    <h2 class="fw-bold mb-1"><i class="bi bi-person-bounding-box text-info"></i> FaceID Check-in</h2>
+    <p class="text-muted mb-4">Sự kiện: <strong>{{ event.title }}</strong></p>
+
+    <div class="camera-container" id="camera-container">
+        <video id="video" autoplay muted playsinline></video>
+        
+        <div class="overlay-ui" id="ui-status">
+            <span class="spinner-border spinner-border-sm text-primary"></span> Đang khởi tạo hệ thống AI...
+        </div>
+
+        <div class="result-modal" id="result-modal">
+            <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+            <h3 class="fw-bold mt-2 text-success">Mời vào!</h3>
+            <p id="result-ticket-info" class="text-muted mb-0"></p>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('main.manage_events') }}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="bi bi-arrow-left"></i> Quay lại
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const video = document.getElementById('video');
+    const statusUi = document.getElementById('ui-status');
+    const resultModal = document.getElementById('result-modal');
+    const resultInfo = document.getElementById('result-ticket-info');
+    
+    let faceMatcher = null;
+    let isProcessing = false; // Cờ khóa để không call API liên tục
+    
+    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+
+    // 1. Khởi động Camera và tải AI
+    async function startSystem() {
+        try {
+            statusUi.innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span> Đang tải Model AI...';
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
+
+            statusUi.innerHTML = '<span class="spinner-border spinner-border-sm text-warning"></span> Đang tải dữ liệu khuôn mặt...';
+            
+            // 2. Fetch danh sách vé (kèm mảng 128 số) từ DB
+            const response = await fetch(`/api/event/{{ event.id }}/face-data`);
+            const data = await response.json();
+            
+            if (!data.data || data.data.length === 0) {
+                statusUi.innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i> Chưa có vé nào phát hành cho FaceID.';
+                return; // Dừng lại nếu ko có ai mua vé
+            }
+
+            // 3. Đưa dữ liệu thành cấu trúc mà face-api hiểu được (LabeledFaceDescriptors)
+            const labeledDescriptors = data.data.map(ticket => {
+                const descriptorArray = new Float32Array(ticket.vector);
+                // Gắn mã vé vào cái Label
+                return new faceapi.LabeledFaceDescriptors(ticket.ticket_code, [descriptorArray]);
+            });
+
+            // Tạo máy quét (Ngưỡng 0.55 - càng nhỏ thì AI soi càng gắt)
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55);
+
+            // Bật Camera
+            statusUi.innerHTML = '<span class="spinner-border spinner-border-sm text-info"></span> Đang mở Camera...';
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(err => {
+                    statusUi.innerHTML = '<i class="bi bi-camera-video-off text-danger"></i> Lỗi không mở được Camera.';
+                });
+
+        } catch (e) {
+            console.error(e);
+            statusUi.innerHTML = 'Lỗi hệ thống!';
+        }
+    }
+
+    // 4. Bắt đầu quét khi Camera lên hình
+    video.addEventListener('play', () => {
+        statusUi.innerHTML = '<i class="bi bi-person-scan text-success"></i> Sẵn sàng quét khuôn mặt';
+        
+        // Vẽ thêm 1 lớp Canvas đè lên Video để vẽ khung mặt
+        const canvas = faceapi.createCanvasFromMedia(video);
+        document.getElementById('camera-container').append(canvas);
+        const displaySize = { width: video.videoWidth, height: video.videoHeight };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        // Chạy vòng lặp vô hạn (mỗi 200ms quét 1 lần)
+        setInterval(async () => {
+            if (isProcessing || !faceMatcher) return;
+
+            // AI trích xuất mặt người đang đứng trước cam
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+            
+            // Xóa khung vẽ cũ
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+            if (detection) {
+                const resizedDetection = faceapi.resizeResults(detection, displaySize);
+                
+                // So sánh mặt đang đứng trước cam với tập Database
+                const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                
+                // Nếu tìm thấy người quen
+                if (bestMatch.label !== 'unknown') {
+                    // KHÓA LẠI (ĐỂ KHÔNG BỊ TRỪ TIỀN CHECKIN NHIỀU LẦN)
+                    isProcessing = true; 
+                    
+                    // Vẽ khung xanh lá cây khen ngợi
+                    const box = resizedDetection.detection.box;
+                    const drawBox = new faceapi.draw.DrawBox(box, { label: 'Đã nhận diện!', boxColor: '#198754' });
+                    drawBox.draw(canvas);
+
+                    // Gọi API ghi nhận Check-in
+                    const checkinRes = await fetch('/api/face-checkin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ticket_code: bestMatch.label,
+                            matched_score: bestMatch.distance, // Lưu lại độ sai số
+                            // Bọc trong nháy kép để IDE không báo lỗi, sau đó ép về kiểu số
+                            event_id: parseInt("{{ event.id }}")
+                        })
+                    });
+                    
+                    const result = await checkinRes.json();
+                    
+                    // Hiện cái Popup xanh lá cây
+                    resultModal.style.display = 'block';
+                    resultInfo.innerHTML = `Mã vé: <strong>${bestMatch.label}</strong><br><small>${result.message}</small>`;
+                    statusUi.style.display = 'none';
+
+                    // Sau 3 giây, tắt Popup và tiếp tục quét người tiếp theo
+                    setTimeout(() => {
+                        resultModal.style.display = 'none';
+                        statusUi.style.display = 'block';
+                        isProcessing = false;
+                    }, 3000);
+
+                } else {
+                    // Vẽ khung đỏ nếu người lạ
+                    const box = resizedDetection.detection.box;
+                    const drawBox = new faceapi.draw.DrawBox(box, { label: 'Người lạ / Sai vé', boxColor: '#dc3545' });
+                    drawBox.draw(canvas);
+                }
+            }
+        }, 200);
+    });
+
+    startSystem();
+});
+</script>
+{% endblock %}
