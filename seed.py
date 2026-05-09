@@ -137,7 +137,29 @@ with app.app_context():
         status='PUBLISHED'
     )
 
-    db.session.add_all([event1, event2, event3, event4, event5, event6])
+    # ---> SỰ KIỆN: ÂM NHẠC TRUNG QUÂN IDOL <---
+    event7 = Event(
+        category_id=cat_music.id,
+        title='Trung Quân - Và Ngày Nào Đó',
+        description='LA MARITZA SHOW – TRUNG QUÂN VÀ NGÀY NÀO ĐÓ' \
+        '\nCó những ngày, ta chỉ muốn thả mình giữa làn mưa mỏng, nghe một giọng hát kể lại những điều tim chưa kịp nói.' \
+        '\nGiữa không gian tầng thượng của Golden Sun Hotel - Dalat, Trung Quân sẽ đưa bạn về với những giai điệu chạm sâu, ' \
+        'nơi âm nhạc hóa thành cảm xúc và mỗi ánh nhìn là một khoảng lặng đẹp đến nao lòng.' \
+        '\n“Và Ngày Nào Đó” – đêm nhạc đặc biệt, sẽ là nơi những bản tình ca được kể bằng cảm xúc thật nhất.',
+        location='Tầng thượng Golden Sun Hotel - Dalat, 01 Bà Huyện Thanh Quan, Phường Xuân Hương',
+        province="Đà Lạt",
+        start_time=now + timedelta(days=5),
+        end_time=now + timedelta(days=5, hours=3),
+        banner_url='https://salt.tkbcdn.com/ts/ds/71/bc/9e/b481aeb38388d78364eabe90ce1ef1df.jpg',
+        base_price=700000,
+        organizer_id=org2.id,
+        sales_start_time=now - timedelta(days=1),
+        sales_end_time=now + timedelta(days=4), 
+        checkin_method='QR',
+        status='PUBLISHED'
+    )
+
+    db.session.add_all([event1, event2, event3, event4, event5, event6, event7])
     db.session.commit()
 
     # ==========================================
@@ -165,6 +187,11 @@ with app.app_context():
         TicketType(event_id=event6.id, name='Trẻ em dưới 1m', price=0, quantity_total=50, quantity_sold=5),
         TicketType(event_id=event6.id, name='Sử đá lưu danh', price=199000, quantity_total=100, quantity_sold=35),
         TicketType(event_id=event6.id, name='Tinh hoa đạo học', price=299000, quantity_total=50, quantity_sold=10),
+    
+        # ---> Vé cho EVENT 7 (Trung Quân) <---
+        TicketType(event_id=event7.id, name='STANDARD', price=700000, quantity_total=100, quantity_sold=75),
+        TicketType(event_id=event7.id, name='SILVER', price=1000000, quantity_total=60, quantity_sold=35),
+        TicketType(event_id=event7.id, name='GOLD', price=1500000, quantity_total=40, quantity_sold=10),
     ]
 
     db.session.add_all(tickets)

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Sự kiện dành riêng cho bạn - EventBox{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary rounded-pill me-3 px-3">
+            <i class="bi bi-arrow-left"></i> Trang chủ
+        </a>
+        <h2 class="fw-bold mb-0 text-primary">
+            <i class="bi bi-stars text-warning"></i> Sự kiện dành riêng cho bạn
+        </h2>
+    </div>
+
+    <div class="alert alert-info border-0 bg-info bg-opacity-10 mb-4 rounded-4">
+        <i class="bi bi-info-circle-fill me-2"></i> Danh sách này được AI chọn lọc dựa trên thể loại các sự kiện mà bạn đã từng tham gia.
+    </div>
+
+    {% if events %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+        {% for event in events %}
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 event-card overflow-hidden">
+                <div class="position-relative">
+                    {% if event.banner_url.startswith('http') %}
+                        <img src="{{ event.banner_url }}" class="card-img-top" alt="{{ event.title }}" style="height: 180px; object-fit: cover;">
+                    {% else %}
+                        <img src="{{ url_for('static', filename=event.banner_url) }}" class="card-img-top" alt="{{ event.title }}" style="height: 180px; object-fit: cover;">
+                    {% endif %}
+                </div>
+                
+                <div class="card-body">
+                    <small class="text-primary fw-bold">{{ event.category.name if event.category else 'Khác' }}</small>
+                    <h5 class="card-title fw-bold mt-1 mb-2 text-truncate" title="{{ event.title }}">{{ event.title }}</h5>
+                    <p class="card-text text-muted small mb-2">
+                        <i class="bi bi-calendar-event me-1"></i> {{ event.start_time.strftime('%d/%m/%Y') }} <br>
+                        <i class="bi bi-geo-alt me-1"></i> {{ event.province }}
+                    </p>
+                </div>
+                <div class="card-footer bg-white border-0 pb-3 pt-0 d-flex justify-content-between align-items-center">
+                    <span class="text-primary fw-bold fs-5">{{ "{:,.0f}".format(event.base_price).replace(',', '.') }}đ</span>
+                    <a href="{{ url_for('main.event_detail', event_id=event.id) }}" class="btn btn-primary rounded-pill px-3 fw-bold">Đặt vé</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-emoji-frown text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3 fw-bold">Chưa có đủ dữ liệu gợi ý</h4>
+        <p class="text-muted">Hãy tham gia thêm các sự kiện để chúng tôi có thể hiểu rõ hơn sở thích của bạn nhé!</p>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary rounded-pill mt-2">Xem tất cả sự kiện</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

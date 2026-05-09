@@ -32,11 +32,65 @@
 
 {% block content %}
 <div class="container">
-    <div class="hero-banner shadow-sm">
-        <h1>Khám phá sự kiện phù hợp với bạn</h1>
-        <p>Tìm kiếm, đặt vé và nhận vé điện tử nhanh chóng cho các sự kiện âm nhạc, hội thảo, thể thao và nhiều hơn nữa.</p>
-        <a href="#" class="btn btn-discover">Khám phá ngay</a>
-    </div>
+    {% if recommended_events %}
+        <div class="bg-primary bg-opacity-10 rounded-4 p-4 p-lg-5 mb-5 mt-4 border border-primary border-opacity-25">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <h3 class="fw-bold mb-0 text-primary">
+                        <i class="bi bi-stars text-warning fs-4"></i> Dành riêng cho bạn
+                    </h3>
+                    <span class="badge bg-primary text-white ms-3 rounded-pill d-none d-md-inline-block">Dựa trên sở thích của bạn</span>
+                </div>
+                <a href="{{ url_for('main.recommendations') }}" class="btn btn-outline-primary bg-white fw-bold rounded-pill shadow-sm px-4">
+                    Khám phá ngay <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+                {% for event in recommended_events %}
+                <div class="col">
+                    <div class="card h-100 border-0 shadow-sm rounded-4 event-card overflow-hidden">
+                        <div class="position-relative">
+                            {% if event.banner_url.startswith('http') %}
+                                <img src="{{ event.banner_url }}" class="card-img-top" alt="{{ event.title }}" style="height: 160px; object-fit: cover;">
+                            {% else %}
+                                <img src="{{ url_for('static', filename=event.banner_url) }}" class="card-img-top" alt="{{ event.title }}" style="height: 160px; object-fit: cover;">
+                            {% endif %}
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-warning text-dark shadow-sm">Gợi ý</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body p-3">
+                            <small class="text-primary fw-bold">{{ event.category.name if event.category else 'Khác' }}</small>
+                            <h6 class="card-title fw-bold mt-1 mb-2 text-truncate" title="{{ event.title }}">{{ event.title }}</h6>
+                            <p class="card-text text-muted small mb-2">
+                                <i class="bi bi-calendar-event me-1"></i> {{ event.start_time.strftime('%d/%m/%Y') }} <br>
+                                <i class="bi bi-geo-alt me-1"></i> {{ event.province }}
+                            </p>
+                        </div>
+                        <div class="card-footer bg-white border-0 pb-3 pt-0 d-flex justify-content-between align-items-center">
+                            <span class="text-primary fw-bold">{{ "{:,.0f}".format(event.base_price).replace(',', '.') }}đ</span>
+                            <a href="{{ url_for('main.event_detail', event_id=event.id) }}" class="btn btn-sm btn-primary rounded-pill px-3">Mua vé</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        <div class="bg-primary rounded-4 p-5 mb-5 mt-4 text-white shadow-sm" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h1 class="fw-bold mb-3">Khám phá sự kiện phù hợp với bạn</h1>
+                    <p class="fs-5 mb-4 text-white-50">Tìm kiếm, đặt vé và nhận vé điện tử nhanh chóng cho các sự kiện âm nhạc, hội thảo, thể thao và nhiều hơn nữa.</p>
+                    <button onclick="window.scrollTo({top: 600, behavior: 'smooth'})" class="btn btn-light text-primary fw-bold px-4 py-2 rounded-pill shadow">
+                        Khám phá ngay <i class="bi bi-chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
     <h3 class="section-title">Danh mục nổi bật</h3>
     <div class="d-flex flex-wrap">

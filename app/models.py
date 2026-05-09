@@ -19,7 +19,7 @@ class Event(db.Model):
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     organizer_id = db.Column(db.BigInteger, db.ForeignKey('organizers.user_id'), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
-
+    category = db.relationship('Category', backref='events', lazy=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     location = db.Column(db.String(255), nullable=False)

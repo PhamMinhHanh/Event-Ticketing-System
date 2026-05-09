@@ -69,11 +69,45 @@ def index():
     # Thực thi truy vấn lấy kết quả
     events = query.all()
     categories = Category.query.all()
-    
-    from datetime import datetime
     now = datetime.now()
 
-    return render_template('index.html', events=events, categories=categories, now=now)
+    # ==========================================
+    # THUẬT TOÁN ĐỀ XUẤT SỰ KIỆN (RECOMMENDATION)
+    # ==========================================
+    recommended_events = []
+    
+    # 1. Kiểm tra nếu khách hàng đã đăng nhập
+    if 'user_id' in session and (session.get('role') == 'USER' or session.get('user_role') == 'USER'):
+        user_id = session['user_id']
+        
+        # 2. Tìm tất cả đơn hàng cũ của người này
+        past_orders = Order.query.filter_by(user_id=user_id, status='PAID').all()
+        
+        if past_orders:
+            favorite_category_ids = set()
+            bought_event_ids = set()
+            
+            # 3. Lọc ra các Thể loại họ hay mua & Những sự kiện họ đã mua rồi
+            for order in past_orders:
+                bought_event_ids.add(order.event_id)
+                event = Event.query.get(order.event_id)
+                if event:
+                    favorite_category_ids.add(event.category_id)
+            
+            # 4. Gợi ý các sự kiện CÙNG THỂ LOẠI, CHƯA MUA, và CHƯA KẾT THÚC
+            if favorite_category_ids:
+                recommended_events = Event.query.filter(
+                    Event.category_id.in_(favorite_category_ids),
+                    Event.id.notin_(bought_event_ids), # Không gợi ý lại cái đã mua
+                    Event.status == 'PUBLISHED',
+                    Event.sales_end_time > now # Vẫn còn mở bán
+                ).limit(4).all() # Lấy tối đa 4 sự kiện để hiện cho đẹp
+
+    return render_template('index.html', 
+                           events=events, 
+                           categories=categories, 
+                           now=now,
+                           recommended_events=recommended_events)
 
 # ======================== [CHI TIẾT SỰ KIỆN] ========================
 @main_bp.route('/event/<int:event_id>')
@@ -911,3 +945,38 @@ def api_face_checkin():
         'message': 'Nhận diện thành công! Mời vào.',
         'ticket_code': ticket.ticket_code
     })
+
+@main_bp.route('/recommendations')
+def recommendations():
+    # 1. Chặn nếu chưa đăng nhập
+    if 'user_id' not in session or (session.get('role') != 'USER' and session.get('user_role') != 'USER'):
+        flash('Vui lòng đăng nhập để xem các sự kiện dành riêng cho bạn!', 'info')
+        return redirect(url_for('main.login'))
+
+    user_id = session['user_id']
+    now = datetime.now()
+    
+    # 2. Lấy đơn hàng cũ
+    past_orders = Order.query.filter_by(user_id=user_id, status='PAID').all()
+    
+    recommended_events = []
+    if past_orders:
+        favorite_category_ids = set()
+        bought_event_ids = set()
+        
+        for order in past_orders:
+            bought_event_ids.add(order.event_id)
+            event = Event.query.get(order.event_id)
+            if event:
+                favorite_category_ids.add(event.category_id)
+        
+        # 3. Lấy TẤT CẢ sự kiện gợi ý (Không dùng .limit(4) nữa)
+        if favorite_category_ids:
+            recommended_events = Event.query.filter(
+                Event.category_id.in_(favorite_category_ids),
+                Event.id.notin_(bought_event_ids),
+                Event.status == 'PUBLISHED',
+                Event.sales_end_time > now
+            ).all()
+
+    return render_template('recommendations.html', events=recommended_events, now=now)
