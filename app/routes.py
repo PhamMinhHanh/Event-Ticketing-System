@@ -422,15 +422,17 @@ def vnpay_return():
     # Đưa người dùng về trang chủ (hoặc trang Lịch sử mua vé sau này)
     return redirect(url_for('main.index'))
 
+# ================================================================================
 # ================================= [VÉ CỦA TÔI] =================================
+# ================================================================================
 @main_bp.route('/my-tickets')
 def my_tickets():
-    # Chặn người lạ
+    # 1. Chặn người lạ (Chưa đăng nhập)
     if 'user_id' not in session:
         flash('Vui lòng đăng nhập để xem vé!', 'error')
         return redirect(url_for('main.login'))
 
-    # Lấy danh sách đơn hàng ĐÃ THANH TOÁN của user này, xếp mới nhất lên đầu
+    # 2. Lấy danh sách đơn hàng ĐÃ THANH TOÁN của user này, xếp mới nhất lên đầu
     orders = Order.query.filter_by(user_id=session['user_id'], status='PAID').order_by(Order.created_at.desc()).all()
     
     my_events = []
@@ -441,7 +443,6 @@ def my_tickets():
         ticket_list = []
         for item in order_items:
             ticket_type = TicketType.query.get(item.ticket_type_id)
-            # Lấy các vé đã phát hành thuộc dòng đơn hàng này
             tickets = Ticket.query.filter_by(order_item_id=item.id).all()
             for t in tickets:
                 ticket_list.append({
@@ -451,17 +452,32 @@ def my_tickets():
                     'status': t.status
                 })
         
+        # --- LOGIC KIỂM TRA HOÀN TIỀN ---
+        from app.models import RefundRequest
+        from datetime import datetime
+        
+        refund_req = RefundRequest.query.filter_by(order_id=order.id).first()
+        refund_status = refund_req.status if refund_req else None
+        
+        # Chỉ cho phép hoàn tiền nếu sự kiện CHƯA bắt đầu và CHƯA gửi yêu cầu nào
+        can_refund = False
+        if event.start_time > datetime.now() and not refund_req:
+            can_refund = True
+        
+
         if ticket_list:
             my_events.append({
+                'order_id': order.id,
                 'order_code': order.order_code,
                 'event_title': event.title,
                 'start_time': event.start_time.strftime('%d/%m/%Y %H:%M'),
                 'location': event.location,
-                'tickets': ticket_list
+                'tickets': ticket_list,
+                'can_refund': can_refund,
+                'refund_status': refund_status
             })
 
     return render_template('my_tickets.html', my_events=my_events)
-
 # ================================= [CHECKIN] ======================================
 @main_bp.route('/event/<int:event_id>/checkin-scanner')
 def checkin_scanner(event_id):
@@ -980,3 +996,98 @@ def recommendations():
             ).all()
 
     return render_template('recommendations.html', events=recommended_events, now=now)
+
+# ===============================================================================
+# =========================== [HOÀN TIỀN (REFUND)] ==============================
+# ===============================================================================
+# 1. Khách hàng gửi yêu cầu hoàn tiền
+@main_bp.route('/request-refund/<int:order_id>', methods=['POST'])
+def request_refund(order_id):
+    if 'user_id' not in session:
+        return redirect(url_for('main.login'))
+        
+    order = Order.query.get_or_404(order_id)
+    # Chỉ chủ nhân đơn hàng mới được hủy và đơn phải đang ở trạng thái PAID
+    if order.user_id != session['user_id'] or order.status != 'PAID':
+        flash('Đơn hàng không hợp lệ để hoàn tiền!', 'error')
+        return redirect(url_for('main.my_tickets'))
+        
+    # Kiểm tra thời gian: Không cho hoàn tiền nếu sự kiện đã bắt đầu
+    event = Event.query.get(order.event_id)
+    if datetime.now() >= event.start_time:
+        flash('Sự kiện đã diễn ra, không thể hoàn tiền!', 'error')
+        return redirect(url_for('main.my_tickets'))
+        
+    # Kiểm tra xem đã gửi yêu cầu trước đó chưa
+    from app.models import RefundRequest
+    existing_req = RefundRequest.query.filter_by(order_id=order.id).first()
+    if existing_req:
+        flash('Bạn đã gửi yêu cầu hoàn tiền cho đơn hàng này rồi! Vui lòng chờ duyệt.', 'warning')
+        return redirect(url_for('main.my_tickets'))
+        
+    reason = request.form.get('reason')
+    new_req = RefundRequest(order_id=order.id, user_id=session['user_id'], reason=reason)
+    db.session.add(new_req)
+    db.session.commit()
+    
+    flash('Đã gửi yêu cầu hoàn tiền thành công. Vui lòng chờ Ban tổ chức xử lý.', 'success')
+    return redirect(url_for('main.my_tickets'))
+
+# 2. Trang quản lý hoàn tiền dành cho Ban tổ chức
+@main_bp.route('/organizer/refunds')
+def manage_refunds():
+    if 'user_id' not in session or (session.get('role') != 'ORGANIZER' and session.get('user_role') != 'ORGANIZER'):
+        flash('Bạn không có quyền truy cập!', 'error')
+        return redirect(url_for('main.login'))
+        
+    from app.models import RefundRequest
+    # Lấy các yêu cầu hoàn tiền thuộc về các sự kiện của Ban tổ chức này
+    refund_requests = db.session.query(RefundRequest, Order, Event, User)\
+        .join(Order, RefundRequest.order_id == Order.id)\
+        .join(Event, Order.event_id == Event.id)\
+        .join(User, RefundRequest.user_id == User.id)\
+        .filter(Event.organizer_id == session['user_id'])\
+        .order_by(RefundRequest.created_at.desc()).all()
+        
+    return render_template('manage_refunds.html', refund_requests=refund_requests)
+
+# 3. Ban tổ chức Xử lý Yêu cầu (Duyệt / Từ chối)
+@main_bp.route('/organizer/refunds/<int:req_id>/<action>', methods=['POST'])
+def process_refund(req_id, action):
+    if 'user_id' not in session or (session.get('role') != 'ORGANIZER' and session.get('user_role') != 'ORGANIZER'):
+        return redirect(url_for('main.login'))
+        
+    from app.models import RefundRequest
+    req = RefundRequest.query.get_or_404(req_id)
+    order = Order.query.get(req.order_id)
+    event = Event.query.get(order.event_id)
+    
+    # Bảo mật: Đảm bảo NTC không duyệt bậy bạ của sự kiện người khác
+    if event.organizer_id != session['user_id']:
+        flash('Không có quyền!', 'error')
+        return redirect(url_for('main.manage_refunds'))
+        
+    if action == 'approve':
+        req.status = 'APPROVED'
+        order.status = 'REFUNDED' # Đổi trạng thái đơn hàng
+        
+        # Đổi trạng thái tất cả vé thành REFUNDED và Trả lại số lượng vé cho hệ thống bán tiếp
+        order_items = OrderItem.query.filter_by(order_id=order.id).all()
+        for item in order_items:
+            tickets = Ticket.query.filter_by(order_item_id=item.id).all()
+            for t in tickets:
+                t.status = 'REFUNDED'
+            
+            # CỘNG LẠI SỐ VÉ ĐỂ KHÁCH KHÁC CÓ THỂ MUA
+            ticket_type = TicketType.query.get(item.ticket_type_id)
+            if ticket_type:
+                ticket_type.quantity_sold -= item.quantity
+                
+        flash(f'Đã DUYỆT hoàn tiền cho đơn {order.order_code}. Hệ thống đã thu hồi vé.', 'success')
+        
+    elif action == 'reject':
+        req.status = 'REJECTED'
+        flash(f'Đã TỪ CHỐI hoàn tiền cho đơn {order.order_code}.', 'info')
+        
+    db.session.commit()
+    return redirect(url_for('main.manage_refunds'))
