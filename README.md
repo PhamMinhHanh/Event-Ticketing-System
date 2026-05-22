@@ -19,18 +19,19 @@ Dự án được phát triển theo từng giai đoạn (Milestones).
 
 ### Cột mốc hiện tại
 - [x] **Duyệt và tìm kiếm sự kiện:** Lọc sự kiện theo danh mục, địa điểm, tìm kiếm theo từ khóa.
+- [x] **Quản lý sự kiện:** Sửa sự kiện, Thống kê doanh thu, cấu hình vé.
 - [x] **Xem chi tiết sự kiện:** Hiển thị thông tin mô tả, thời gian, địa điểm, ...
 - [x] **Khám phá loại vé:** Tích hợp bộ đếm hiển thị số lượng vé còn lại và giá vé.
-- [x] **Quét vé Check-in (Mã QR):** Quét QR Code.
+- [x] **Quét vé Check-in:** Quét QR Code/ Face ID.
 - [x] **Thanh toán online VNPay:** Tích hợp Payment Gateway.
 - [x] **Tạo sự kiện:** Tạo mới sự kiện.
+- [x] **Hoàn tiền:** Yêu cầu hoàn tiền (hủy vé) được gửi tới BTC xét duyệt.
+- [x] **Gợi ý sự kiện:** Đề xuất cá nhân hóa dựa trên lịch sử tương tác.
+- [x] **Dynamic Pricing:** Điều chỉnh giá vé tự động theo nhu cầu.
 
 ### Cột mốc tiếp theo (Các tính năng sắp và đang phát triển)
-- [ ] **Hoàn tiền:** Tích hợp Payment Gateway.
-- [ ] **Quản lý sự kiện:** Sửa sự kiện, Thống kê doanh thu, cấu hình vé.
-- [ ] **Quét vé Check-in (Face ID):** Quét nhận diện khuôn mặt.
-- [ ] **Gợi ý sự kiện:** Đề xuất cá nhân hóa dựa trên lịch sử tương tác.
-- [ ] **Dynamic Pricing:** Điều chỉnh giá vé tự động theo nhu cầu.
+- [ ] **Gửi Email** .
+- [ ] **Public web ra Internet** 
 
 ---
 
